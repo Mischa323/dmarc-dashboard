@@ -1,3 +1,11 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# TLS certificates (auto-generated, contain private key)
+certs/
+
+# Python (legacy)
 __pycache__/
 *.py[cod]
 *.pyo

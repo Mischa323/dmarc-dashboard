@@ -1,0 +1,196 @@
+<div class="d-flex align-items-center mb-4 gap-3">
+  <h4 class="mb-0 fw-bold">Overview</h4>
+  <select id="daysPicker" class="form-select form-select-sm w-auto" onchange="loadStats(this.value)">
+    <option value="7">Last 7 days</option>
+    <option value="30" selected>Last 30 days</option>
+    <option value="90">Last 90 days</option>
+    <option value="365">Last 12 months</option>
+  </select>
+  <small id="lastUpdated" class="text-secondary ms-auto"></small>
+</div>
+
+<!-- Summary cards -->
+<div class="row g-3 mb-4" id="summaryCards">
+  <% for (let i = 0; i < 6; i++) { %>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card p-3 stat-card text-center">
+      <div class="text-secondary small mb-1 placeholder-glow"><span class="placeholder col-8"></span></div>
+      <div class="display-6 placeholder-glow"><span class="placeholder col-6"></span></div>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<!-- Charts row 1 -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <h6 class="text-secondary mb-3">DMARC Result</h6>
+      <div class="chart-container"><canvas id="resultPie"></canvas></div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card p-3 h-100">
+      <h6 class="text-secondary mb-3">Daily message volume</h6>
+      <div class="chart-container"><canvas id="trendLine"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts row 2 -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <h6 class="text-secondary mb-3">Failure breakdown</h6>
+      <div class="chart-container"><canvas id="failureDoughnut"></canvas></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <h6 class="text-secondary mb-3">Top source IPs</h6>
+      <div class="chart-container"><canvas id="ipBar"></canvas></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <h6 class="text-secondary mb-3">Top reporting organisations</h6>
+      <div class="chart-container"><canvas id="orgBar"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let charts = {};
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function buildSummaryCards(s) {
+  const passRate = s.pass_rate;
+  const rateCard = passRate >= 98 ? 'card-pass' : passRate >= 90 ? 'card-warn' : 'card-fail';
+  const rateColor = passRate >= 98 ? 'var(--clr-pass)' : passRate >= 90 ? 'var(--clr-warn)' : 'var(--clr-fail)';
+
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="col-6 col-md-4 col-xl-2"><div class="card p-3 stat-card text-center">
+      <div class="text-secondary small mb-1">Reports</div>
+      <div class="display-6">${s.total_reports}</div>
+    </div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card p-3 stat-card text-center">
+      <div class="text-secondary small mb-1">Total messages</div>
+      <div class="display-6">${s.total_messages.toLocaleString()}</div>
+    </div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card card-pass p-3 stat-card text-center">
+      <div class="small mb-1" style="color:rgba(var(--clr-pass-rgb),.65);">Passed</div>
+      <div class="display-6 pass-color">${s.pass_count.toLocaleString()}</div>
+    </div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card card-fail p-3 stat-card text-center">
+      <div class="small mb-1" style="color:rgba(var(--clr-fail-rgb),.65);">Failed</div>
+      <div class="display-6 fail-color">${s.fail_count.toLocaleString()}</div>
+    </div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card ${rateCard} p-3 stat-card text-center">
+      <div class="small mb-1" style="color:${rateColor};opacity:.7;">Pass rate</div>
+      <div class="display-6" style="color:${rateColor}">${s.pass_rate}%</div>
+    </div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card p-3 stat-card text-center">
+      <div class="text-secondary small mb-1">Unique IPs</div>
+      <div class="display-6">${s.unique_ips}</div>
+    </div></div>`;
+}
+
+function buildResultPie(s) {
+  destroyChart('resultPie');
+  charts['resultPie'] = new Chart(document.getElementById('resultPie'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Pass', 'Fail'],
+      datasets: [{ data: [s.pass_count, s.fail_count], backgroundColor: [cssClr('--clr-pass-rgb'), cssClr('--clr-fail-rgb')], borderWidth: 0 }]
+    },
+    options: { plugins: { legend: { position: 'bottom' } }, cutout: '65%' }
+  });
+}
+
+function buildTrendLine(trend) {
+  destroyChart('trendLine');
+  charts['trendLine'] = new Chart(document.getElementById('trendLine'), {
+    type: 'bar',
+    data: {
+      labels: trend.map(d => d.date),
+      datasets: [
+        { label: 'Pass', data: trend.map(d => d.pass), backgroundColor: cssClr('--clr-pass-rgb', .55), stack: 'a' },
+        { label: 'Fail', data: trend.map(d => d.fail), backgroundColor: cssClr('--clr-fail-rgb', .55), stack: 'a' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+      plugins: { legend: { position: 'top' } }
+    }
+  });
+}
+
+function buildFailureDoughnut(f) {
+  destroyChart('failureDoughnut');
+  charts['failureDoughnut'] = new Chart(document.getElementById('failureDoughnut'), {
+    type: 'doughnut',
+    data: {
+      labels: ['DKIM + SPF fail', 'DKIM fail only', 'SPF fail only'],
+      datasets: [{ data: [f.dkim_and_spf, f.dkim_only, f.spf_only], backgroundColor: [cssClr('--clr-fail-rgb'), cssClr('--clr-warn-rgb'), cssClr('--clr-accent-rgb')], borderWidth: 0 }]
+    },
+    options: { plugins: { legend: { position: 'bottom' } }, cutout: '60%' }
+  });
+}
+
+function buildIpBar(sources) {
+  destroyChart('ipBar');
+  const top = sources.slice(0, 10);
+  charts['ipBar'] = new Chart(document.getElementById('ipBar'), {
+    type: 'bar',
+    data: {
+      labels: top.map(s => s.ip),
+      datasets: [
+        { label: 'Pass', data: top.map(s => s.pass), backgroundColor: cssClr('--clr-pass-rgb', .55), stack: 'a' },
+        { label: 'Fail', data: top.map(s => s.fail), backgroundColor: cssClr('--clr-fail-rgb', .55), stack: 'a' }
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } },
+      plugins: { legend: { position: 'top' } }
+    }
+  });
+}
+
+function buildOrgBar(orgs) {
+  destroyChart('orgBar');
+  charts['orgBar'] = new Chart(document.getElementById('orgBar'), {
+    type: 'bar',
+    data: {
+      labels: orgs.map(o => o.org),
+      datasets: [
+        { label: 'Pass', data: orgs.map(o => o.pass), backgroundColor: cssClr('--clr-pass-rgb', .55), stack: 'a' },
+        { label: 'Fail', data: orgs.map(o => o.fail), backgroundColor: cssClr('--clr-fail-rgb', .55), stack: 'a' }
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } },
+      plugins: { legend: { position: 'top' } }
+    }
+  });
+}
+
+async function loadStats(days) {
+  const res = await fetch('/api/stats?days=' + days);
+  const data = await res.json();
+  buildSummaryCards(data.summary);
+  buildResultPie(data.summary);
+  buildTrendLine(data.daily_trend);
+  buildFailureDoughnut(data.failure_reasons);
+  buildIpBar(data.top_sources);
+  buildOrgBar(data.top_orgs);
+  document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+loadStats(30);
+</script>

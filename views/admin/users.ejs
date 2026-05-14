@@ -1,0 +1,194 @@
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h4 class="mb-0 fw-bold">Users</h4>
+  <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#addLocalUser">
+    <i class="bi bi-person-plus me-1"></i>Add local user
+  </button>
+</div>
+
+<% if (flash) { %>
+<div class="alert alert-success alert-dismissible py-2 mb-3">
+  <i class="bi bi-check-circle me-1"></i><%= flash %>
+  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+</div>
+<% } %>
+
+<!-- Add local user form -->
+<div class="collapse mb-4" id="addLocalUser">
+  <div class="card p-4">
+    <h6 class="fw-semibold mb-3">New local user</h6>
+    <% if (locals.error) { %>
+    <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3">
+      <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i><span><%= error %></span>
+    </div>
+    <% } %>
+    <form method="post" action="/admin/local-users" autocomplete="off">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label small fw-medium">Username</label>
+          <input type="text" name="username" class="form-control form-control-sm"
+                 style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
+                 placeholder="username" minlength="3" required />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-medium">Password</label>
+          <input type="password" name="password" class="form-control form-control-sm"
+                 style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
+                 placeholder="min 8 characters" minlength="8" required />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-medium">Confirm password</label>
+          <input type="password" name="confirmPassword" class="form-control form-control-sm"
+                 style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
+                 placeholder="repeat password" minlength="8" required />
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small fw-medium">Role</label>
+          <select name="role" class="form-select form-select-sm"
+                  style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);">
+            <option value="viewer">viewer</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+          <button type="submit" class="btn btn-sm btn-success w-100">Add</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Local users -->
+<h6 class="text-secondary small fw-semibold text-uppercase mb-2" style="letter-spacing:.05em;">
+  <i class="bi bi-person-fill me-1"></i>Local users (<%= localUsers.length %>)
+</h6>
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Role</th>
+          <th>2FA</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const u of localUsers) { %>
+        <tr>
+          <td class="fw-semibold small">
+            <i class="bi bi-person-circle me-1 text-secondary"></i><%= u.username %>
+            <% if (u.role === 'local_admin') { %>
+            <span class="badge ms-1" style="background:rgba(255,214,10,.1);color:#ffd60a;border:1px solid rgba(255,214,10,.2);font-size:.7rem;">local admin</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (u.role === 'local_admin') { %>
+            <span class="text-secondary small">local_admin</span>
+            <% } else { %>
+            <form method="post" action="/admin/local-users/<%= u.id %>/role" class="d-inline">
+              <select name="role" class="form-select form-select-sm" style="width:auto;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
+                      onchange="this.form.submit()">
+                <option value="viewer" <%= u.role === 'viewer' ? 'selected' : '' %>>viewer</option>
+                <option value="admin"  <%= u.role === 'admin'  ? 'selected' : '' %>>admin</option>
+              </select>
+            </form>
+            <% } %>
+          </td>
+          <td class="small">
+            <% if (u.role === 'local_admin') { %>
+              <% if (u.totp_enabled) { %>
+              <span class="text-success"><i class="bi bi-shield-check me-1"></i>enabled</span>
+              <% } else { %>
+              <span class="text-secondary">disabled</span>
+              <% } %>
+            <% } else { %>
+            <span class="text-secondary">—</span>
+            <% } %>
+          </td>
+          <td class="small text-secondary"><%= u.created_at ? u.created_at.slice(0, 10) : '—' %></td>
+          <td class="text-end">
+            <% if (u.role !== 'local_admin') { %>
+            <form method="post" action="/admin/local-users/<%= u.id %>/delete"
+                  onsubmit="return confirm('Delete user \'<%= u.username %>\'?')">
+              <button class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+            <% } %>
+          </td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SSO users -->
+<h6 class="text-secondary small fw-semibold text-uppercase mb-2" style="letter-spacing:.05em;">
+  <i class="bi bi-microsoft me-1"></i>SSO users (<%= ssoUsers.length %>)
+</h6>
+
+<% if (ssoUsers.length === 0) { %>
+<div class="card p-4 text-center text-secondary">
+  <i class="bi bi-people mb-3" style="font-size:2rem;"></i>
+  <p class="mb-0 small">No SSO users yet. Users are created automatically on first Microsoft login.</p>
+</div>
+<% } else { %>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Tenant</th>
+          <th>Role</th>
+          <th>Last login</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const u of ssoUsers) { %>
+        <tr>
+          <td>
+            <div class="fw-semibold small"><%= u.display_name || u.email %></div>
+            <div class="text-secondary" style="font-size:.8rem;"><%= u.email %></div>
+          </td>
+          <td class="small text-secondary"><%= u.tenant_name || '—' %></td>
+          <td>
+            <form method="post" action="/admin/users/<%= u.id %>/role" class="d-flex align-items-center gap-1">
+              <select name="role" class="form-select form-select-sm" style="width:auto;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
+                      onchange="this.form.submit()">
+                <option value="viewer" <%= u.role === 'viewer' ? 'selected' : '' %>>viewer</option>
+                <option value="admin"  <%= u.role === 'admin'  ? 'selected' : '' %>>admin</option>
+              </select>
+            </form>
+          </td>
+          <td class="small text-secondary"><%= u.last_login ? u.last_login.slice(0, 16).replace('T', ' ') : 'Never' %></td>
+          <td class="text-end">
+            <form method="post" action="/admin/users/<%= u.id %>/delete"
+                  onsubmit="return confirm('Remove <%= u.email %>?')">
+              <button class="btn btn-sm btn-outline-danger">Remove</button>
+            </form>
+          </td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
+<div class="card mt-4 p-3">
+  <h6 class="text-secondary small mb-2 fw-semibold text-uppercase" style="letter-spacing:.05em">Roles</h6>
+  <div class="row g-2 small text-secondary">
+    <div class="col-md-4"><strong class="text-light">local_admin</strong> — full access including 2FA and danger zone. Created during setup.</div>
+    <div class="col-md-4"><strong class="text-light">admin</strong> — full access including tenant/user management, but not danger zone.</div>
+    <div class="col-md-4"><strong class="text-light">viewer</strong> — read-only access to dashboard and reports.</div>
+  </div>
+</div>
+
+<% if (locals.error) { %>
+<script>
+  const el = document.getElementById('addLocalUser');
+  if (el) new bootstrap.Collapse(el, { show: true });
+</script>
+<% } %>

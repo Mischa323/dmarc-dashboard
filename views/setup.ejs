@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Setup — DMARC Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
+  <style>
+    body { background: #0d1117; color: #e6edf3; }
+    .setup-wrap { min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1rem; }
+    .setup-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; max-width: 640px; width: 100%; }
+    .section-label { color: #8b949e; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+    .form-control, .form-select { background: #0d1117; border-color: #30363d; color: #e6edf3; }
+    .form-control:focus, .form-select:focus { background: #0d1117; border-color: #58a6ff; color: #e6edf3; box-shadow: 0 0 0 3px rgba(88,166,255,.15); }
+    .form-control::placeholder { color: #484f58; }
+    .form-text { color: #8b949e; }
+    .checklist { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: .75rem 1rem; }
+    .checklist ol { margin: 0; padding-left: 1.25rem; }
+    .checklist li { padding: .45rem 0; border-bottom: 1px solid #21262d; font-size: .875rem; line-height: 1.55; }
+    .checklist li:last-child { border-bottom: none; }
+    .perm { display: inline-block; font-family: monospace; font-size: .8rem; font-weight: 600; padding: 1px 7px; border-radius: 4px; margin: 1px; }
+    .perm-delegated { background: #1a3a1a; color: #3fb950; border: 1px solid #2ea04326; }
+    .perm-admin     { background: #3a2a0a; color: #d29922; border: 1px solid #d2992226; }
+    .perm-oidc      { background: #0d2a3a; color: #58a6ff; border: 1px solid #58a6ff26; }
+    a { color: #58a6ff; }
+    code { color: #79c0ff; background: #1c2128; padding: 1px 6px; border-radius: 4px; font-size: .85em; }
+    .divider { border-color: #30363d; }
+    .input-group-text { background: #1c2128; border-color: #30363d; color: #8b949e; }
+  </style>
+</head>
+<body>
+<div class="setup-wrap">
+  <div class="setup-card p-4 p-md-5 m-2">
+
+    <div class="text-center mb-4">
+      <i class="bi bi-shield-check text-success" style="font-size:2.5rem;"></i>
+      <h3 class="fw-bold mt-2 mb-1"><%= configured ? 'Reconfigure' : 'Welcome to DMARC Dashboard' %></h3>
+      <p class="text-secondary mb-0 small">Connect your Microsoft 365 mailbox. Users sign in with their Office 365 account.</p>
+    </div>
+
+    <% if (error) { %>
+    <div class="alert alert-danger d-flex align-items-center gap-2 py-2" role="alert">
+      <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+      <span><%= error %></span>
+    </div>
+    <% } %>
+
+    <!-- Azure checklist -->
+    <div class="checklist mb-4">
+      <p class="section-label mb-2">Azure app registration checklist</p>
+      <ol>
+        <li>
+          <strong>Azure Portal → Entra ID → App registrations → New registration.</strong>
+          Give it a name, e.g. <em>DMARC Dashboard</em>.
+        </li>
+        <li>
+          <strong>Authentication → Add a platform → Web.</strong>
+          Set the redirect URI to the value shown in the form below and enable <strong>ID tokens</strong>.
+        </li>
+        <li>
+          <strong>API permissions → Add a permission → Microsoft Graph.</strong><br>
+          <strong>Delegated</strong> permissions (users consent on sign-in):<br>
+          <span class="perm perm-delegated">Mail.Read</span>
+          <span class="perm perm-oidc">openid</span>
+          <span class="perm perm-oidc">profile</span>
+          <span class="perm perm-oidc">email</span>
+          <span class="perm perm-oidc">offline_access</span><br>
+          <strong>Application</strong> permission for background scheduler (admin consent required):<br>
+          <span class="perm perm-admin">Mail.Read</span>
+        </li>
+        <li>
+          <strong>Certificates &amp; secrets → New client secret.</strong>
+          Copy the <em>Value</em> (not the ID).
+        </li>
+        <li>
+          Copy the <strong>Tenant ID</strong> and <strong>Application (client) ID</strong> from the app overview page.
+        </li>
+      </ol>
+    </div>
+
+    <form method="post" action="/setup" novalidate>
+
+      <!-- Server URL -->
+      <p class="section-label mb-2">Server</p>
+
+      <div class="mb-2">
+        <label class="form-label" for="serverUrl">Server URL</label>
+        <input type="text" class="form-control" id="serverUrl"
+               value="<%= values.redirectUri.replace('/auth/callback', '') %>"
+               placeholder="https://localhost:3443" />
+        <div class="form-text mt-1">
+          Protocol + hostname + port where this app runs.
+          Changing this auto-updates the redirect URI below.
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label" for="redirectUri">Redirect URI <span class="text-secondary small">(register this in step 2)</span></label>
+        <input type="text" class="form-control font-monospace" id="redirectUri" name="redirectUri"
+               value="<%= values.redirectUri %>" required />
+      </div>
+
+      <hr class="divider my-4" />
+
+      <!-- App registration -->
+      <p class="section-label mb-2">App registration</p>
+
+      <div class="mb-3">
+        <label class="form-label" for="tenantId">Tenant ID <span class="text-danger">*</span></label>
+        <input type="text" class="form-control font-monospace" id="tenantId" name="tenantId"
+               value="<%= values.tenantId %>"
+               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="clientId">Application (client) ID <span class="text-danger">*</span></label>
+        <input type="text" class="form-control font-monospace" id="clientId" name="clientId"
+               value="<%= values.clientId %>"
+               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required />
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label" for="clientSecret">Client Secret <span class="text-danger">*</span></label>
+        <input type="password" class="form-control" id="clientSecret" name="clientSecret"
+               placeholder="<%= configured ? 'Leave blank to keep existing secret' : 'Paste the secret value here' %>" <%= configured ? '' : 'required' %> />
+        <div class="form-text mt-1">Stored locally in <code>.env</code>. Never sent anywhere except Microsoft.</div>
+      </div>
+
+      <hr class="divider my-4" />
+
+      <!-- Mailbox -->
+      <p class="section-label mb-2">Mailbox</p>
+
+      <div class="mb-3">
+        <label class="form-label" for="mailbox">DMARC report mailbox <span class="text-danger">*</span></label>
+        <input type="email" class="form-control" id="mailbox" name="mailbox"
+               value="<%= values.mailbox %>"
+               placeholder="dmarc@yourdomain.com" required />
+        <div class="form-text mt-1">The mailbox that receives DMARC aggregate reports. Signed-in users must have read access.</div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label" for="mailFolder">Folder</label>
+        <input type="text" class="form-control" id="mailFolder" name="mailFolder"
+               value="<%= values.mailFolder %>" placeholder="Inbox" />
+      </div>
+
+      <hr class="divider my-4" />
+
+      <!-- Polling -->
+      <p class="section-label mb-2">Background polling</p>
+
+      <div class="mb-4">
+        <label class="form-label" for="fetchIntervalMinutes">Fetch interval (minutes)</label>
+        <input type="number" class="form-control" id="fetchIntervalMinutes" name="fetchIntervalMinutes"
+               value="<%= values.fetchIntervalMinutes %>" placeholder="60" min="5" max="1440" />
+        <div class="form-text mt-1">
+          Requires the Application <span class="perm perm-admin" style="font-size:.75rem">Mail.Read</span> permission with admin consent (step 3).
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-success w-100 py-2 fw-semibold">
+        <i class="bi bi-check-lg me-1"></i>
+        <%= configured ? 'Save changes' : 'Save and sign in with Microsoft' %>
+      </button>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const serverUrlInput = document.getElementById('serverUrl');
+  const redirectUriInput = document.getElementById('redirectUri');
+
+  serverUrlInput.addEventListener('input', () => {
+    const base = serverUrlInput.value.replace(/\/+$/, '');
+    redirectUriInput.value = base ? base + '/auth/callback' : '';
+  });
+
+  // On reconfigure, if secret field is blank keep the existing one
+  const form = document.querySelector('form');
+  form.addEventListener('submit', (e) => {
+    const secret = document.getElementById('clientSecret');
+    if (!secret.value.trim() && secret.getAttribute('required') === null) {
+      // Insert a hidden field to signal "keep existing"
+      const hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'clientSecret';
+      hidden.value = '__keep__';
+      form.appendChild(hidden);
+      secret.disabled = true;
+    }
+  });
+</script>
+</body>
+</html>

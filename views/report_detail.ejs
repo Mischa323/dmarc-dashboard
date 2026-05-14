@@ -1,0 +1,124 @@
+<div class="mb-4">
+  <a href="/reports" class="text-secondary text-decoration-none small">
+    <i class="bi bi-arrow-left me-1"></i>All reports
+  </a>
+</div>
+
+<!-- Header -->
+<div class="row g-3 mb-4">
+  <div class="col-md-8">
+    <h4 class="fw-bold mb-1"><%= report.domain %></h4>
+    <p class="text-secondary mb-0">
+      Report by <strong class="text-light"><%= report.org_name || 'Unknown' %></strong>
+      &nbsp;·&nbsp;
+      <%= report.begin_date ? report.begin_date.slice(0, 10) : '?' %>
+      –
+      <%= report.end_date ? report.end_date.slice(0, 10) : '?' %>
+    </p>
+  </div>
+  <div class="col-md-4 text-md-end">
+    <span class="display-6 fw-bold <%=
+      report.pass_rate >= 98 ? 'pass-color' :
+      report.pass_rate >= 90 ? 'text-warning' :
+      'fail-color'
+    %>"><%= report.pass_rate %>%</span>
+    <div class="text-secondary small">pass rate</div>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3"><div class="card p-3 text-center">
+    <div class="text-secondary small mb-1">Total messages</div>
+    <div class="fs-3 fw-bold"><%= report.total_messages %></div>
+  </div></div>
+  <div class="col-6 col-md-3"><div class="card p-3 text-center">
+    <div class="text-secondary small mb-1">Passed</div>
+    <div class="fs-3 fw-bold pass-color"><%= report.passed_messages %></div>
+  </div></div>
+  <div class="col-6 col-md-3"><div class="card p-3 text-center">
+    <div class="text-secondary small mb-1">Failed</div>
+    <div class="fs-3 fw-bold fail-color"><%= report.failed_messages %></div>
+  </div></div>
+  <div class="col-6 col-md-3"><div class="card p-3 text-center">
+    <div class="text-secondary small mb-1">Policy</div>
+    <div class="fs-3 fw-bold"><code><%= report.policy_p %></code></div>
+  </div></div>
+</div>
+
+<!-- Policy details -->
+<div class="card p-3 mb-4">
+  <h6 class="text-secondary mb-3">Published policy</h6>
+  <div class="row g-2 small">
+    <div class="col-6 col-md-2"><span class="text-secondary">Domain:</span><br><strong><%= report.domain %></strong></div>
+    <div class="col-6 col-md-2"><span class="text-secondary">p=</span><br><code><%= report.policy_p %></code></div>
+    <div class="col-6 col-md-2"><span class="text-secondary">sp=</span><br><code><%= report.policy_sp || '—' %></code></div>
+    <div class="col-6 col-md-2"><span class="text-secondary">pct=</span><br><code><%= report.policy_pct %>%</code></div>
+    <div class="col-6 col-md-2"><span class="text-secondary">adkim=</span><br><code><%= report.adkim === 'r' ? 'relaxed' : 'strict' %></code></div>
+    <div class="col-6 col-md-2"><span class="text-secondary">aspf=</span><br><code><%= report.aspf === 'r' ? 'relaxed' : 'strict' %></code></div>
+  </div>
+</div>
+
+<!-- Record table -->
+<div class="card">
+  <div class="px-3 pt-3 pb-2">
+    <h6 class="text-secondary mb-0">Records (<%= report.records.length %>)</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Source IP</th>
+          <th class="text-end">Count</th>
+          <th>DMARC</th>
+          <th>Disposition</th>
+          <th>DKIM aligned</th>
+          <th>SPF aligned</th>
+          <th>DKIM auth (domain)</th>
+          <th>SPF auth (domain)</th>
+          <th>Failure reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const rec of report.records) { %>
+        <tr>
+          <td><code class="small"><%= rec.source_ip || '—' %></code></td>
+          <td class="text-end"><%= rec.count %></td>
+          <td>
+            <% if (rec.dmarc_pass) { %>
+            <span class="badge badge-pass px-2 py-1">PASS</span>
+            <% } else { %>
+            <span class="badge badge-fail px-2 py-1">FAIL</span>
+            <% } %>
+          </td>
+          <td><code class="small text-secondary"><%= rec.disposition %></code></td>
+          <td>
+            <span class="small <%= rec.dkim_aligned === 'pass' ? 'pass-color' : 'fail-color' %>">
+              <%= rec.dkim_aligned || '—' %>
+            </span>
+          </td>
+          <td>
+            <span class="small <%= rec.spf_aligned === 'pass' ? 'pass-color' : 'fail-color' %>">
+              <%= rec.spf_aligned || '—' %>
+            </span>
+          </td>
+          <td class="small text-secondary">
+            <%= rec.dkim_auth_result || '—' %>
+            <% if (rec.dkim_domain) { %><span class="text-muted">(<%= rec.dkim_domain %>)</span><% } %>
+          </td>
+          <td class="small text-secondary">
+            <%= rec.spf_auth_result || '—' %>
+            <% if (rec.spf_domain) { %><span class="text-muted">(<%= rec.spf_domain %>)</span><% } %>
+          </td>
+          <td class="small <%= !rec.dmarc_pass ? 'fail-color' : 'text-secondary' %>">
+            <% if (rec.failure_reason === 'dkim_and_spf') { %>Both DKIM &amp; SPF failed
+            <% } else if (rec.failure_reason === 'dkim_only') { %>DKIM alignment failed
+            <% } else if (rec.failure_reason === 'spf_only') { %>SPF alignment failed
+            <% } else { %>—<% } %>
+          </td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>

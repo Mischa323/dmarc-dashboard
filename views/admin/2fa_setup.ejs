@@ -1,0 +1,104 @@
+<div class="mb-4">
+  <h4 class="fw-bold mb-0">Two-factor authentication</h4>
+</div>
+
+<% if (flash) { %>
+<div class="alert alert-success alert-dismissible py-2 mb-4">
+  <i class="bi bi-check-circle me-1"></i><%= flash %>
+  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+</div>
+<% } %>
+
+<% if (error) { %>
+<div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-4">
+  <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i><span><%= error %></span>
+</div>
+<% } %>
+
+<% if (enabled) { %>
+<!-- 2FA is currently enabled -->
+<div class="card p-4 mb-3" style="border-color:rgba(48,209,88,.28)!important;">
+  <div class="d-flex align-items-center gap-3">
+    <i class="bi bi-shield-check text-success fs-3 flex-shrink-0"></i>
+    <div>
+      <h6 class="fw-semibold mb-1 text-success">2FA is enabled</h6>
+      <p class="text-secondary small mb-0">
+        Your account is protected with a time-based one-time password (TOTP).
+        Use your authenticator app every time you sign in.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="card p-4" style="border-color:rgba(255,69,58,.28)!important;">
+  <h6 class="fw-semibold mb-1">Disable 2FA</h6>
+  <p class="text-secondary small mb-3">
+    You will no longer need a code when signing in. Your account will be less secure.
+  </p>
+  <form method="post" action="/admin/2fa/disable"
+        onsubmit="return confirm('Disable 2FA? Your account will only be protected by your password.')">
+    <button type="submit" class="btn btn-sm btn-outline-danger">Disable 2FA</button>
+  </form>
+</div>
+
+<% } else { %>
+<!-- 2FA setup flow -->
+<div class="row g-4">
+  <div class="col-md-5">
+    <div class="card p-4 h-100 text-center">
+      <p class="text-secondary small mb-3">
+        <strong class="text-light">Step 1</strong> — Scan this QR code with your authenticator app
+        (Google Authenticator, Microsoft Authenticator, Authy, etc.)
+      </p>
+      <% if (qrDataUrl) { %>
+      <img src="<%= qrDataUrl %>" alt="QR code" class="img-fluid mx-auto mb-3"
+           style="max-width:200px;border-radius:8px;background:#fff;padding:8px;" />
+      <% } %>
+      <details class="text-start">
+        <summary class="text-secondary small" style="cursor:pointer;">Can't scan? Enter manually</summary>
+        <div class="mt-2 p-2 rounded" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;">
+          <code class="small" style="word-break:break-all;"><%= secret %></code>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <div class="col-md-7">
+    <div class="card p-4 h-100">
+      <p class="text-secondary small mb-4">
+        <strong class="text-light">Step 2</strong> — Enter the 6-digit code shown in your app to confirm setup.
+      </p>
+      <form method="post" action="/admin/2fa/enable" autocomplete="off">
+        <div class="mb-3">
+          <label class="form-label fw-medium">Verification code</label>
+          <input type="text" class="form-control form-control-lg text-center"
+                 name="token" placeholder="000 000" maxlength="7"
+                 inputmode="numeric" autofocus required
+                 style="letter-spacing:.35em;font-size:1.5rem;" />
+          <div class="form-text">The code changes every 30 seconds.</div>
+        </div>
+        <button type="submit" class="btn btn-success w-100 py-2 fw-semibold">
+          <i class="bi bi-shield-check me-1"></i>Enable 2FA
+        </button>
+      </form>
+
+      <hr class="my-3" />
+      <p class="text-secondary small mb-0">
+        <i class="bi bi-info-circle me-1"></i>
+        The secret is only saved after you enter a valid code.
+        If you close this page without confirming, 2FA will not be enabled.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const input = document.querySelector('input[name="token"]');
+  if (input) {
+    input.addEventListener('input', () => {
+      const digits = input.value.replace(/\D/g, '');
+      if (digits.length === 6) { input.value = digits; input.form.submit(); }
+    });
+  }
+</script>
+<% } %>

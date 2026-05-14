@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Setup — DMARC Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
+  <style>
+    body {
+      background:
+        radial-gradient(ellipse 70% 55% at 12% 10%, rgba(94,60,255,.22) 0%, transparent 65%),
+        radial-gradient(ellipse 55% 45% at 88% 85%, rgba(10,132,255,.18) 0%, transparent 65%),
+        #000;
+      background-attachment: fixed;
+      color: rgba(255,255,255,.88);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .wizard-header {
+      background: rgba(0,0,0,.45);
+      backdrop-filter: blur(30px) saturate(200%);
+      -webkit-backdrop-filter: blur(30px) saturate(200%);
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      padding: .85rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+    .wizard-header .brand { font-weight: 650; font-size: 1rem; color: rgba(255,255,255,.92); text-decoration: none; }
+    .wizard-body { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; }
+    .wizard-card {
+      background: rgba(255,255,255,.055);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255,255,255,.09);
+      border-radius: 22px;
+      box-shadow: 0 8px 48px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+      max-width: 520px;
+      width: 100%;
+      padding: 2.5rem;
+    }
+    .step-dots { display: flex; gap: .5rem; align-items: center; }
+    .step-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.15); transition: all .2s; }
+    .step-dot.active { background: #30d158; width: 24px; border-radius: 4px; }
+    .step-dot.done { background: rgba(48,209,88,.4); }
+    .form-control, .form-select {
+      background: rgba(255,255,255,.07);
+      border-color: rgba(255,255,255,.1);
+      color: rgba(255,255,255,.9);
+      border-radius: 10px;
+    }
+    .form-control:focus, .form-select:focus {
+      background: rgba(255,255,255,.1);
+      border-color: rgba(10,132,255,.7);
+      color: rgba(255,255,255,.95);
+      box-shadow: 0 0 0 3px rgba(10,132,255,.18);
+    }
+    .form-control::placeholder { color: rgba(255,255,255,.25); }
+    .form-text { color: rgba(255,255,255,.38); font-size: .79rem; }
+    .form-label { color: rgba(255,255,255,.72); font-size: .85rem; font-weight: 500; }
+    a { color: #0a84ff; }
+    .text-secondary { color: rgba(255,255,255,.42) !important; }
+    .btn-success { background: linear-gradient(145deg,#35d669,#26a645); border: none; color: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(48,209,88,.32); }
+    .btn-success:hover { background: linear-gradient(145deg,#3ddb72,#2db84e); color: #fff; }
+    .alert-danger { background: rgba(255,69,58,.1); border: 1px solid rgba(255,69,58,.22); color: #ff453a; border-radius: 12px; }
+    .alert-success { background: rgba(48,209,88,.1); border: 1px solid rgba(48,209,88,.22); color: #30d158; border-radius: 12px; }
+    code { background: rgba(255,255,255,.08); border-radius: 5px; padding: .1em .38em; color: rgba(255,255,255,.7); font-size: .84em; }
+  </style>
+</head>
+<body>
+  <header class="wizard-header">
+    <i class="bi bi-shield-check text-success fs-5"></i>
+    <span class="brand">DMARC Dashboard</span>
+    <span class="text-secondary ms-auto small">Setup</span>
+  </header>
+
+  <main class="wizard-body">
+    <div class="wizard-card">
+      <% if (typeof step !== 'undefined') { %>
+      <div class="step-dots mb-4">
+        <% for (let i = 1; i <= 3; i++) { %>
+        <div class="step-dot <%= i === step ? 'active' : i < step ? 'done' : '' %>"></div>
+        <% } %>
+        <span class="text-secondary small ms-2">Step <%= step %> of 3</span>
+      </div>
+      <% } %>
+
+      <%- body %>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+node_modules
+.env
+dmarc.db*
+certs/
+.git
+*.py
+requirements.txt
+run.py
+dmarc_dashboard/
+README.md

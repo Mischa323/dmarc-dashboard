@@ -1,0 +1,27 @@
+{
+  "name": "dmarc-dashboard",
+  "version": "1.0.0",
+  "description": "DMARC aggregate report dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.16.2",
+    "adm-zip": "^0.5.16",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-ejs-layouts": "^2.5.1",
+    "express-session": "^1.18.1",
+    "fast-xml-parser": "^4.5.1",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.7.0",
+    "otplib": "^12.0.1",
+    "qrcode": "^1.5.4",
+    "selfsigned": "^2.4.1"
+  }
+}

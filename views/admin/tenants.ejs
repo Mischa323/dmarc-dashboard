@@ -1,0 +1,251 @@
+<div class="d-flex align-items-center mb-4 gap-3">
+  <h4 class="mb-0 fw-bold">Tenants</h4>
+  <span class="text-secondary small">
+    <i class="bi bi-clock me-1"></i>Global fetch interval: <strong class="text-light"><%= globalInterval %>m</strong>
+    <a href="/admin/settings" class="ms-1 text-secondary" style="font-size:.8rem;">(change)</a>
+  </span>
+  <a href="/admin/tenants/new" class="btn btn-sm btn-success ms-auto">
+    <i class="bi bi-plus-lg me-1"></i>Add tenant
+  </a>
+</div>
+
+<% if (flash) { %>
+<div class="alert alert-success alert-dismissible py-2 mb-3" role="alert">
+  <i class="bi bi-check-circle me-1"></i><%= flash %>
+  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+</div>
+<% } %>
+
+<% if (tenants.length === 0) { %>
+<div class="card p-5 text-center text-secondary">
+  <i class="bi bi-buildings mb-3" style="font-size:2rem;"></i>
+  <p class="mb-2">No tenants configured yet.</p>
+  <a href="/admin/tenants/new" class="btn btn-sm btn-success">Add your first tenant</a>
+</div>
+<% } else { %>
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Domains</th>
+          <th>SSO</th>
+          <th>Interval</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const t of tenants) { %>
+        <tr id="row-<%= t.id %>">
+          <td>
+            <div class="fw-semibold small"><%= t.name %></div>
+            <div class="text-secondary" style="font-size:.75rem;"><%= t.mailbox %></div>
+          </td>
+          <td class="small">
+            <% if (t.domains && t.domains.length > 0) { %>
+              <% for (const d of t.domains) { %>
+              <div class="d-flex align-items-center gap-1 mb-1">
+                <span class="text-secondary"><%= d.domain %></span>
+                <% if (d.dmarc_policy === 'reject') { %>
+                <span class="badge" style="background:rgba(255,69,58,.12);color:#ff453a;border:1px solid rgba(255,69,58,.22);font-size:.65rem;">reject</span>
+                <% } else if (d.dmarc_policy === 'quarantine') { %>
+                <span class="badge" style="background:rgba(255,159,10,.12);color:#ff9f0a;border:1px solid rgba(255,159,10,.22);font-size:.65rem;">quarantine</span>
+                <% } else { %>
+                <span class="badge" style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.1);font-size:.65rem;">none</span>
+                <% } %>
+              </div>
+              <% } %>
+            <% } else { %>
+            <span class="text-secondary">—</span>
+            <% } %>
+          </td>
+          <td><!-- policy now shown per-domain --></td>
+          <td>
+            <% if (t.sso_enabled) { %>
+            <span class="badge" style="background:rgba(10,132,255,.12);color:#0a84ff;border:1px solid rgba(10,132,255,.22);"><i class="bi bi-microsoft me-1"></i>enabled</span>
+            <% } else { %>
+            <span class="text-secondary small">off</span>
+            <% } %>
+          </td>
+          <td class="small">
+            <% if (t.fetch_interval_override != null) { %>
+            <span class="fw-semibold text-light"><%= t.fetch_interval_override %>m</span>
+            <span class="badge ms-1" style="background:rgba(255,159,10,.12);color:#ff9f0a;border:1px solid rgba(255,159,10,.22);font-size:.65rem;">custom</span>
+            <% } else { %>
+            <span class="text-secondary"><%= globalInterval %>m</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (t.enabled) { %>
+            <span class="badge badge-pass px-2 py-1">Active</span>
+            <% } else { %>
+            <span class="badge bg-secondary bg-opacity-25 text-secondary px-2 py-1">Disabled</span>
+            <% } %>
+          </td>
+          <td class="text-end" style="min-width:260px;">
+            <div class="d-flex gap-1 justify-content-end flex-wrap">
+              <button class="btn btn-sm btn-outline-secondary" id="testBtn-<%= t.id %>"
+                      onclick="testTenant(<%= t.id %>)">
+                <i class="bi bi-plug me-1"></i>Test
+              </button>
+              <% if (t.domains && t.domains.length > 0) { %>
+              <button class="btn btn-sm btn-outline-secondary" type="button"
+                      onclick="showRecords(<%- JSON.stringify(t.domains) %>, '<%= t.mailbox.replace(/'/g,"\\'"  ) %>')">
+                <i class="bi bi-file-text me-1"></i>Records
+              </button>
+              <% } %>
+              <a href="/admin/tenants/<%= t.id %>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+              <form method="post" action="/admin/tenants/<%= t.id %>/toggle" class="d-inline">
+                <button class="btn btn-sm btn-outline-secondary"><%= t.enabled ? 'Disable' : 'Enable' %></button>
+              </form>
+              <form method="post" action="/admin/tenants/<%= t.id %>/delete" class="d-inline"
+                    onsubmit="return confirm('Delete tenant \'<%= t.name %>\'? This cannot be undone.')">
+                <button class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        <!-- inline test result row (hidden by default) -->
+        <tr id="testRow-<%= t.id %>" style="display:none;">
+          <td colspan="7" class="pt-0 pb-2 px-3">
+            <div id="testResult-<%= t.id %>" class="rounded p-3 small"></div>
+          </td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
+<!-- DMARC records modal -->
+<div class="modal fade" id="recordModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-semibold">DMARC DNS records</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-secondary small mb-3">
+          Add these TXT records to your DNS to publish your DMARC policy.
+          Changes can take up to 48 hours to propagate.
+        </p>
+        <div id="modalRecords"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card p-3">
+  <h6 class="text-secondary mb-2 small fw-semibold text-uppercase" style="letter-spacing:.05em">Azure app registration checklist</h6>
+  <ol class="small text-secondary mb-0 ps-3">
+    <li class="mb-1"><strong class="text-light">New registration</strong> — give it a name, set redirect URI to <code>https://your-host/auth/callback</code> (only if SSO login is enabled).</li>
+    <li class="mb-1"><strong class="text-light">API permissions → Application</strong>: <code>Mail.Read</code> with admin consent (required for all tenants).</li>
+    <li class="mb-1"><strong class="text-light">API permissions → Delegated</strong> (SSO only): <code>Mail.Read</code>, <code>openid</code>, <code>profile</code>, <code>email</code>, <code>offline_access</code>.</li>
+    <li class="mb-0"><strong class="text-light">Certificates &amp; secrets</strong> — create a client secret, copy the <em>Value</em>.</li>
+  </ol>
+</div>
+
+<script>
+  async function testTenant(id) {
+    const btn    = document.getElementById('testBtn-' + id);
+    const row    = document.getElementById('testRow-' + id);
+    const result = document.getElementById('testResult-' + id);
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Testing…';
+    row.style.display = 'none';
+
+    try {
+      const r    = await fetch('/admin/tenants/' + id + '/test', { method: 'POST' });
+      const data = await r.json();
+      const checks = data.checks || [];
+
+      const anyFailed = checks.some(c => c.ok === false);
+      const anyWarn   = !anyFailed && checks.some(c => c.ok === 'warn');
+
+      let html = '<div class="d-flex flex-column gap-2">';
+      for (const c of checks) {
+        let icon, color;
+        if (c.ok === true)        { icon = 'bi-check-circle-fill';         color = '#30d158'; }
+        else if (c.ok === false)  { icon = 'bi-x-circle-fill';             color = '#ff453a'; }
+        else if (c.ok === 'warn') { icon = 'bi-exclamation-triangle-fill'; color = '#ff9f0a'; }
+        else                      { icon = 'bi-dash-circle';                color = 'rgba(255,255,255,.38)'; }
+
+        html += '<div class="d-flex align-items-start gap-2">';
+        html += '<i class="bi ' + icon + ' flex-shrink-0 mt-1" style="color:' + color + ';"></i>';
+        html += '<div><span class="fw-semibold" style="color:' + color + ';">' + escHtml(c.label) + '</span>';
+        if (c.error)  html += '<br><span class="text-secondary small" style="white-space:pre-line;">' + escHtml(c.error) + '</span>';
+        if (c.detail) html += '<br><code class="small" style="color:rgba(255,255,255,.45);word-break:break-all;">' + escHtml(c.detail) + '</code>';
+        html += '</div></div>';
+      }
+      html += '</div>';
+
+      if (anyFailed) {
+        result.style.cssText = 'background:rgba(255,69,58,.07);border:1px solid rgba(255,69,58,.2);border-radius:12px;backdrop-filter:blur(12px);';
+      } else if (anyWarn) {
+        result.style.cssText = 'background:rgba(255,159,10,.07);border:1px solid rgba(255,159,10,.2);border-radius:12px;backdrop-filter:blur(12px);';
+      } else {
+        result.style.cssText = 'background:rgba(48,209,88,.07);border:1px solid rgba(48,209,88,.2);border-radius:12px;backdrop-filter:blur(12px);';
+      }
+      result.innerHTML = html;
+      row.style.display = '';
+    } catch (e) {
+      result.style.cssText = 'background:rgba(255,69,58,.07);border:1px solid rgba(255,69,58,.2);border-radius:12px;backdrop-filter:blur(12px);';
+      result.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2" style="color:#ff453a;"></i><span style="color:#ff453a;">Request failed: ' + escHtml(e.message) + '</span>';
+      row.style.display = '';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-plug me-1"></i>Test';
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function showRecords(domains, mailbox) {
+    const container = document.getElementById('modalRecords');
+    container.innerHTML = domains.map(d => {
+      const name  = `_dmarc.${d.domain}`;
+      const value = `v=DMARC1; p=${d.dmarc_policy || 'none'}; rua=mailto:${mailbox};`;
+      return `
+        <div class="mb-4">
+          <div class="fw-semibold small text-light mb-2">${escHtml(d.domain)}</div>
+          <div class="mb-2">
+            <label class="form-label small text-secondary fw-semibold text-uppercase mb-1" style="letter-spacing:.05em;font-size:.7rem;">Name (TXT)</label>
+            <div class="d-flex gap-2">
+              <input type="text" class="form-control font-monospace form-control-sm"
+                     style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.85);" readonly value="${escHtml(name)}" />
+              <button class="btn btn-sm btn-outline-secondary flex-shrink-0" onclick="copyInput(this)">
+                <i class="bi bi-clipboard"></i>
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="form-label small text-secondary fw-semibold text-uppercase mb-1" style="letter-spacing:.05em;font-size:.7rem;">Value</label>
+            <div class="d-flex gap-2">
+              <input type="text" class="form-control font-monospace form-control-sm"
+                     style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.85);" readonly value="${escHtml(value)}" />
+              <button class="btn btn-sm btn-outline-secondary flex-shrink-0" onclick="copyInput(this)">
+                <i class="bi bi-clipboard"></i>
+              </button>
+            </div>
+          </div>
+        </div>`;
+    }).join('<hr style="border-color:rgba(255,255,255,.07);">');
+    new bootstrap.Modal(document.getElementById('recordModal')).show();
+  }
+
+  function copyInput(btn) {
+    const input = btn.previousElementSibling;
+    navigator.clipboard.writeText(input.value).then(() => {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="bi bi-check"></i>';
+      setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    });
+  }
+</script>

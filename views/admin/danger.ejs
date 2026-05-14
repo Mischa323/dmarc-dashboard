@@ -1,0 +1,58 @@
+<div class="d-flex align-items-center mb-4">
+  <h4 class="mb-0 fw-bold text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Danger Zone</h4>
+</div>
+
+<% if (flash) { %>
+<div class="alert alert-success alert-dismissible py-2 mb-4">
+  <i class="bi bi-check-circle me-1"></i><%= flash %>
+  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+</div>
+<% } %>
+
+<% if (error) { %>
+<div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-4">
+  <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i><span><%= error %></span>
+</div>
+<% } %>
+
+<!-- Delete report data -->
+<div class="card p-4 mb-3" style="border-color:rgba(255,69,58,.28)!important;">
+  <div class="d-flex align-items-start gap-3">
+    <i class="bi bi-trash3 text-danger mt-1 fs-5 flex-shrink-0"></i>
+    <div class="flex-grow-1">
+      <h6 class="fw-semibold mb-1">Delete all DMARC report data</h6>
+      <p class="text-secondary small mb-3">
+        Removes all imported reports and records from the database.
+        Tenants, users and configuration are kept.
+      </p>
+      <form method="post" action="/admin/danger/reset-reports">
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm" name="confirm"
+                 placeholder='Type DELETE to confirm' style="max-width:220px;" required />
+          <button type="submit" class="btn btn-sm btn-danger">Delete reports</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Full reset -->
+<div class="card p-4" style="border-color:rgba(255,69,58,.5)!important;background:rgba(255,69,58,.04)!important;">
+  <div class="d-flex align-items-start gap-3">
+    <i class="bi bi-fire text-danger mt-1 fs-5 flex-shrink-0"></i>
+    <div class="flex-grow-1">
+      <h6 class="fw-semibold mb-1 text-danger">Reset entire application</h6>
+      <p class="text-secondary small mb-3">
+        Deletes the database, <code>.env</code> file and TLS certificates.
+        The application will restart in setup mode. <strong class="text-danger">This cannot be undone.</strong>
+      </p>
+      <form method="post" action="/admin/danger/reset-all">
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm" name="confirm"
+                 placeholder='Type RESET to confirm' style="max-width:220px;" required />
+          <button type="submit" class="btn btn-sm btn-danger">Reset everything</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

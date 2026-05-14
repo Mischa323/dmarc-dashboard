@@ -1,0 +1,19 @@
+services:
+  dmarc-dashboard:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3443:3443"
+    volumes:
+      - dmarc_data:/data
+    environment:
+      # Generate a strong random value and set it here — never leave it empty in production.
+      SECRET: "change-me-to-a-random-64-char-string"
+      PORT: "3443"
+      DATABASE_URL: "/data/dmarc.db"
+      CERTS_DIR: "/data/certs"
+      # Uncomment the line below when running behind a reverse proxy that terminates TLS.
+      # HTTP_MODE: "1"
+
+volumes:
+  dmarc_data:

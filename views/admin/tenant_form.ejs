@@ -1,0 +1,426 @@
+<div class="mb-4">
+  <a href="/admin/tenants" class="text-secondary text-decoration-none small">
+    <i class="bi bi-arrow-left me-1"></i>Back to tenants
+  </a>
+</div>
+
+<h4 class="fw-bold mb-1"><%= tenant.id ? 'Edit tenant' : 'Add tenant' %></h4>
+
+<!-- Legend -->
+<div class="d-flex flex-wrap gap-2 mb-4 align-items-center">
+  <span class="text-secondary small">Settings are used for:</span>
+  <span class="badge" style="background:rgba(48,209,88,.1);color:#30d158;border:1px solid rgba(48,209,88,.22);"><i class="bi bi-envelope me-1"></i>Email monitoring</span>
+  <span class="badge" style="background:rgba(10,132,255,.1);color:#0a84ff;border:1px solid rgba(10,132,255,.22);"><i class="bi bi-microsoft me-1"></i>SSO login</span>
+  <span class="badge" style="background:rgba(163,113,247,.1);color:#bf8fff;border:1px solid rgba(163,113,247,.22);"><i class="bi bi-file-text me-1"></i>DNS record</span>
+</div>
+
+<% if (error) { %>
+<div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-4">
+  <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i><span><%= error %></span>
+</div>
+<% } %>
+
+<div class="row g-4 align-items-start">
+
+  <!-- ── Left: form ─────────────────────────────────────────────────────── -->
+  <div class="col-lg-7">
+  <form method="post" action="<%= tenant.id ? '/admin/tenants/' + tenant.id : '/admin/tenants' %>" id="tenantForm">
+
+    <!-- Azure App Registration -->
+    <div class="card p-4 mb-3">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <h6 class="text-secondary mb-0 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Azure app registration</h6>
+        <span class="badge" style="background:rgba(48,209,88,.1);color:#30d158;border:1px solid rgba(48,209,88,.22);font-size:.7rem;"><i class="bi bi-envelope me-1"></i>Email monitoring</span>
+        <span class="badge" style="background:rgba(10,132,255,.1);color:#0a84ff;border:1px solid rgba(10,132,255,.22);font-size:.7rem;"><i class="bi bi-microsoft me-1"></i>SSO login</span>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="name">Display name <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" id="name" name="name" value="<%= tenant.name %>" placeholder="e.g. Contoso" required />
+        <div class="form-text">A friendly name shown in the dashboard and on the login page.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="tenant_id">Tenant ID <span class="text-danger">*</span></label>
+        <input type="text" class="form-control font-monospace" id="tenant_id" name="tenant_id" value="<%= tenant.tenant_id %>" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required />
+        <div class="form-text">
+          Found in <strong class="text-light">Azure Active Directory → Overview</strong>.
+          Used to authenticate all API calls to Microsoft.
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="client_id">Application (client) ID <span class="text-danger">*</span></label>
+        <input type="text" class="form-control font-monospace" id="client_id" name="client_id" value="<%= tenant.client_id %>" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required />
+        <div class="form-text">Found in <strong class="text-light">App registrations → your app → Overview</strong>.</div>
+      </div>
+
+      <div class="mb-0">
+        <label class="form-label" for="client_secret">Client secret <span class="text-danger">*</span></label>
+        <input type="password" class="form-control" id="client_secret" name="client_secret"
+               placeholder="<%= tenant.id ? 'Leave blank to keep existing' : 'Paste the secret value' %>"
+               <%= tenant.id ? '' : 'required' %> />
+        <div class="form-text">
+          <% if (tenant.id) { %>Leave blank to keep the current secret. — <% } %>
+          Found in <strong class="text-light">Certificates &amp; secrets → New client secret</strong>. Copy the <em>Value</em> immediately.
+        </div>
+      </div>
+    </div>
+
+    <!-- Mailbox -->
+    <div class="card p-4 mb-3">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <h6 class="text-secondary mb-0 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Mailbox</h6>
+        <span class="badge" style="background:rgba(48,209,88,.1);color:#30d158;border:1px solid rgba(48,209,88,.22);font-size:.7rem;"><i class="bi bi-envelope me-1"></i>Email monitoring</span>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="mailbox">DMARC report mailbox <span class="text-danger">*</span></label>
+        <input type="email" class="form-control" id="mailbox" name="mailbox" value="<%= tenant.mailbox %>"
+               placeholder="dmarc@yourdomain.com" required />
+        <div class="form-text">
+          The mailbox that receives DMARC aggregate report emails (<code>.xml.gz</code> / <code>.zip</code>).
+          Read via Graph API using the app credentials above.
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="mail_folder">Folder</label>
+        <input type="text" class="form-control" id="mail_folder" name="mail_folder" value="<%= tenant.mail_folder %>" placeholder="Inbox" />
+        <div class="form-text">The mailbox folder to scan. Defaults to <code>Inbox</code>.</div>
+      </div>
+
+      <div class="mb-0">
+        <label class="form-label">Background fetch interval</label>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="useGlobalInterval"
+                 name="use_global_interval" value="1"
+                 <%= tenant.fetch_interval_override == null ? 'checked' : '' %>
+                 onchange="toggleIntervalOverride(this.checked)" />
+          <label class="form-check-label small" for="useGlobalInterval">
+            Use global default (<span id="globalIntervalLabel"><%= globalInterval %></span> min)
+          </label>
+        </div>
+        <div id="intervalOverrideWrap" style="<%= tenant.fetch_interval_override != null ? '' : 'display:none;' %>">
+          <div class="input-group input-group-sm" style="max-width:180px;">
+            <input type="number" class="form-control" id="fetch_interval_override"
+                   name="fetch_interval_override"
+                   value="<%= tenant.fetch_interval_override != null ? tenant.fetch_interval_override : globalInterval %>"
+                   min="5" max="1440" />
+            <span class="input-group-text text-secondary">min</span>
+          </div>
+          <div class="form-text">Custom override — minimum 5 minutes.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DMARC Domains -->
+    <div class="card p-4 mb-3">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <h6 class="text-secondary mb-0 small fw-semibold text-uppercase" style="letter-spacing:.05em;">DMARC domains</h6>
+        <span class="badge" style="background:rgba(163,113,247,.1);color:#bf8fff;border:1px solid rgba(163,113,247,.22);font-size:.7rem;"><i class="bi bi-file-text me-1"></i>DNS record</span>
+      </div>
+      <p class="text-secondary small mb-3">
+        Each domain gets its own DNS TXT record. Add all domains this tenant's mailbox receives reports for.
+      </p>
+
+      <div id="domainList">
+        <% for (let i = 0; i < (tenant.domains || []).length; i++) { %>
+        <div class="domain-row mb-2 p-3 rounded" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);">
+          <div class="row g-2 align-items-end mb-2">
+            <div class="col-md-6">
+              <label class="form-label small mb-1">Domain</label>
+              <input type="text" class="form-control form-control-sm domain-input"
+                     name="domains[<%= i %>][domain]"
+                     value="<%= tenant.domains[i].domain %>"
+                     placeholder="yourdomain.com"
+                     oninput="updateRowPreview(this.closest('.domain-row'))" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1">Policy <span class="text-secondary fw-normal">(p=)</span></label>
+              <select class="form-select form-select-sm policy-select"
+                      name="domains[<%= i %>][policy]"
+                      onchange="updateRowPreview(this.closest('.domain-row'))">
+                <option value="none"       <%= tenant.domains[i].dmarc_policy === 'none'       ? 'selected' : '' %>>none</option>
+                <option value="quarantine" <%= tenant.domains[i].dmarc_policy === 'quarantine' ? 'selected' : '' %>>quarantine</option>
+                <option value="reject"     <%= tenant.domains[i].dmarc_policy === 'reject'     ? 'selected' : '' %>>reject</option>
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="removeDomain(this)">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+          </div>
+          <div class="row g-0">
+            <div class="col-md-2 pe-2">
+              <div class="text-secondary" style="font-size:.68rem;">Name</div>
+              <code class="row-preview-name small text-secondary" style="font-size:.75rem;">_dmarc.yourdomain.com</code>
+            </div>
+            <div class="col-md-1 pe-2">
+              <div class="text-secondary" style="font-size:.68rem;">Type</div>
+              <code class="small text-secondary" style="font-size:.75rem;">TXT</code>
+            </div>
+            <div class="col-md-9">
+              <div class="text-secondary" style="font-size:.68rem;">Value</div>
+              <code class="row-preview-value small text-secondary" style="font-size:.75rem;word-break:break-all;"></code>
+            </div>
+          </div>
+        </div>
+        <% } %>
+      </div>
+
+      <button type="button" class="btn btn-sm btn-outline-success mt-1" onclick="addDomain()">
+        <i class="bi bi-plus-lg me-1"></i>Add domain
+      </button>
+    </div>
+
+    <!-- SSO login -->
+    <div class="card p-4 mb-4">
+      <div class="d-flex align-items-center justify-content-between mb-1">
+        <div class="d-flex align-items-center gap-2">
+          <h6 class="text-secondary mb-0 small fw-semibold text-uppercase" style="letter-spacing:.05em;">SSO login</h6>
+          <span class="badge" style="background:rgba(10,132,255,.1);color:#0a84ff;border:1px solid rgba(10,132,255,.22);font-size:.7rem;"><i class="bi bi-microsoft me-1"></i>SSO login</span>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" role="switch" id="sso_enabled" name="sso_enabled"
+                 value="1" <%= parseInt(tenant.sso_enabled) !== 0 ? 'checked' : '' %>
+                 onchange="toggleSso(this.checked)" />
+          <label class="form-check-label small text-secondary" for="sso_enabled">Enabled</label>
+          <input type="hidden" name="sso_enabled" value="0" />
+        </div>
+      </div>
+      <p class="text-secondary small mb-3">
+        When enabled, a <em>Sign in with Microsoft</em> button appears on the login page.
+        Users are created automatically on first login.
+      </p>
+
+      <div id="ssoFields" style="<%= parseInt(tenant.sso_enabled) === 0 ? 'display:none;' : '' %>">
+        <div class="mb-3">
+          <label class="form-label" for="serverUrl">Server URL</label>
+          <input type="text" class="form-control" id="serverUrl"
+                 placeholder="https://localhost:3443"
+                 value="<%= tenant.redirect_uri ? tenant.redirect_uri.replace('/auth/callback','') : '' %>" />
+          <div class="form-text">The public URL of this dashboard. Auto-fills the redirect URI below.</div>
+        </div>
+        <div class="mb-0">
+          <label class="form-label" for="redirect_uri">Redirect URI</label>
+          <input type="text" class="form-control font-monospace" id="redirect_uri" name="redirect_uri"
+                 value="<%= tenant.redirect_uri %>" placeholder="https://your-host/auth/callback" />
+          <div class="form-text">
+            Must be registered exactly in <strong class="text-light">App registrations → Authentication → Redirect URIs</strong>.
+          </div>
+        </div>
+      </div>
+      <div id="ssoOff" class="text-secondary small" style="<%= parseInt(tenant.sso_enabled) !== 0 ? 'display:none;' : '' %>">
+        <i class="bi bi-info-circle me-1"></i>SSO disabled — monitoring only.
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-success px-4">
+      <i class="bi bi-check-lg me-1"></i><%= tenant.id ? 'Save changes' : 'Add tenant' %>
+    </button>
+    <a href="/admin/tenants" class="btn btn-link text-secondary ms-2">Cancel</a>
+  </form>
+  </div>
+
+  <!-- ── Right: permissions guide ──────────────────────────────────────── -->
+  <div class="col-lg-5">
+    <div style="position:sticky;top:1rem;">
+
+      <!-- Required permissions -->
+      <div class="card p-4 mb-3">
+        <h6 class="fw-semibold mb-3"><i class="bi bi-shield-lock me-2 text-warning"></i>Required Azure permissions</h6>
+
+        <!-- Application permissions (always) -->
+        <div class="mb-3">
+          <div class="small fw-semibold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.7rem;">
+            Application permissions <span class="badge ms-1" style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.1);font-size:.65rem;">admin consent required</span>
+          </div>
+          <div class="d-flex align-items-start gap-2 py-2" style="border-bottom:1px solid rgba(255,255,255,.07);">
+            <code class="small text-warning">Mail.Read</code>
+            <div class="ms-auto text-end">
+              <span class="badge" style="background:rgba(48,209,88,.1);color:#30d158;border:1px solid rgba(48,209,88,.22);font-size:.65rem;"><i class="bi bi-envelope me-1"></i>Email monitoring</span>
+            </div>
+          </div>
+          <div class="text-secondary small mt-1" style="font-size:.78rem;">
+            Lets the background scheduler read the DMARC mailbox without a signed-in user.
+          </div>
+        </div>
+
+        <!-- Delegated permissions (SSO only) -->
+        <div id="permDelegated">
+          <div class="small fw-semibold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.7rem;">
+            Delegated permissions <span class="badge" style="background:rgba(10,132,255,.1);color:#0a84ff;border:1px solid rgba(10,132,255,.22);font-size:.65rem;">SSO only</span>
+          </div>
+          <table class="w-100 small mb-1" style="border-collapse:collapse;">
+            <tbody>
+              <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+                <td class="py-2"><code class="text-warning">Mail.Read</code></td>
+                <td class="py-2 text-end"><span class="badge" style="background:rgba(48,209,88,.1);color:#30d158;border:1px solid rgba(48,209,88,.22);font-size:.65rem;"><i class="bi bi-envelope me-1"></i>Email monitoring</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+                <td class="py-2"><code class="text-warning">openid</code></td>
+                <td class="py-2 text-end"><span class="badge" style="background:rgba(10,132,255,.1);color:#0a84ff;border:1px solid rgba(10,132,255,.22);font-size:.65rem;"><i class="bi bi-microsoft me-1"></i>SSO login</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+                <td class="py-2"><code class="text-warning">profile</code></td>
+                <td class="py-2 text-end"><span class="badge" style="background:rgba(10,132,255,.1);color:#0a84ff;border:1px solid rgba(10,132,255,.22);font-size:.65rem;"><i class="bi bi-microsoft me-1"></i>SSO login</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+                <td class="py-2"><code class="text-warning">email</code></td>
+                <td class="py-2 text-end"><span class="badge" style="background:rgba(10,132,255,.1);color:#0a84ff;border:1px solid rgba(10,132,255,.22);font-size:.65rem;"><i class="bi bi-microsoft me-1"></i>SSO login</span></td>
+              </tr>
+              <tr>
+                <td class="py-2"><code class="text-warning">offline_access</code></td>
+                <td class="py-2 text-end"><span class="badge" style="background:rgba(10,132,255,.1);color:#0a84ff;border:1px solid rgba(10,132,255,.22);font-size:.65rem;"><i class="bi bi-microsoft me-1"></i>SSO login</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="text-secondary small mt-1" style="font-size:.78rem;">
+            <code>openid</code>, <code>profile</code>, <code>email</code> provide the user's identity on login.
+            <code>offline_access</code> allows refreshing the mail access token in the background.
+          </div>
+        </div>
+      </div>
+
+      <!-- Setup checklist -->
+      <div class="card p-4">
+        <h6 class="fw-semibold mb-3"><i class="bi bi-list-check me-2 text-success"></i>Azure setup steps</h6>
+        <ol class="mb-0 ps-3" style="line-height:1.9;">
+          <li class="small text-secondary mb-1">
+            <strong class="text-light">App registrations → New registration</strong><br>
+            Give it a name.
+            <span id="stepRedirect" class="text-secondary"> Set a redirect URI of type <em>Web</em> to <code id="stepRedirectUri">https://your-host/auth/callback</code>. Enable <strong class="text-light">ID tokens</strong> under Authentication.</span>
+            <span id="stepNoRedirect" style="display:none;" class="text-secondary"> No redirect URI needed (monitoring only).</span>
+          </li>
+          <li class="small text-secondary mb-1">
+            <strong class="text-light">API permissions → Add a permission → Microsoft Graph</strong><br>
+            Add the permissions listed above.
+          </li>
+          <li class="small text-secondary mb-1">
+            <strong class="text-light">Grant admin consent</strong> for the Application <code>Mail.Read</code> permission.
+          </li>
+          <li class="small text-secondary">
+            <strong class="text-light">Certificates &amp; secrets → New client secret</strong><br>
+            Copy the <em>Value</em> immediately — it won't be shown again.
+          </li>
+        </ol>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /row -->
+
+<script>
+  // ── Interval override toggle ────────────────────────────────────────────────
+  function toggleIntervalOverride(isGlobal) {
+    document.getElementById('intervalOverrideWrap').style.display = isGlobal ? 'none' : '';
+  }
+
+  // ── SSO toggle ──────────────────────────────────────────────────────────────
+  function toggleSso(enabled) {
+    document.getElementById('ssoFields').style.display      = enabled ? '' : 'none';
+    document.getElementById('ssoOff').style.display         = enabled ? 'none' : '';
+    document.getElementById('permDelegated').style.display  = enabled ? '' : 'none';
+    document.getElementById('stepRedirect').style.display   = enabled ? '' : 'none';
+    document.getElementById('stepNoRedirect').style.display = enabled ? 'none' : '';
+  }
+  toggleSso(document.getElementById('sso_enabled').checked);
+
+  document.getElementById('serverUrl').addEventListener('input', function () {
+    const base = this.value.replace(/\/+$/, '');
+    document.getElementById('redirect_uri').value = base + '/auth/callback';
+    document.getElementById('stepRedirectUri').textContent = base + '/auth/callback';
+  });
+  document.getElementById('redirect_uri').addEventListener('input', function () {
+    document.getElementById('stepRedirectUri').textContent = this.value || 'https://your-host/auth/callback';
+  });
+
+  // ── Multi-domain management ─────────────────────────────────────────────────
+  let _domainIdx = <%= (tenant.domains || []).length %>;
+
+  function domainRowHtml(idx, domain, policy) {
+    const opts = ['none','quarantine','reject'].map(v =>
+      `<option value="${v}"${v === policy ? ' selected' : ''}>${v}</option>`
+    ).join('');
+    return `
+      <div class="domain-row mb-2 p-3 rounded" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);">
+        <div class="row g-2 align-items-end mb-2">
+          <div class="col-md-6">
+            <label class="form-label small mb-1">Domain</label>
+            <input type="text" class="form-control form-control-sm domain-input"
+                   name="domains[${idx}][domain]" value="${escAttr(domain)}"
+                   placeholder="yourdomain.com"
+                   oninput="updateRowPreview(this.closest('.domain-row'))" />
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-1">Policy <span class="text-secondary fw-normal">(p=)</span></label>
+            <select class="form-select form-select-sm policy-select"
+                    name="domains[${idx}][policy]"
+                    onchange="updateRowPreview(this.closest('.domain-row'))">${opts}</select>
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="removeDomain(this)">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+        </div>
+        <div class="row g-0">
+          <div class="col-md-2 pe-2">
+            <div class="text-secondary" style="font-size:.68rem;">Name</div>
+            <code class="row-preview-name small text-secondary" style="font-size:.75rem;"></code>
+          </div>
+          <div class="col-md-1 pe-2">
+            <div class="text-secondary" style="font-size:.68rem;">Type</div>
+            <code class="small text-secondary" style="font-size:.75rem;">TXT</code>
+          </div>
+          <div class="col-md-9">
+            <div class="text-secondary" style="font-size:.68rem;">Value</div>
+            <code class="row-preview-value small text-secondary" style="font-size:.75rem;word-break:break-all;"></code>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function addDomain() {
+    const div = document.createElement('div');
+    div.innerHTML = domainRowHtml(_domainIdx++, '', 'none');
+    document.getElementById('domainList').appendChild(div.firstElementChild);
+    reindex();
+  }
+
+  function removeDomain(btn) {
+    btn.closest('.domain-row').remove();
+    reindex();
+  }
+
+  function reindex() {
+    document.querySelectorAll('#domainList .domain-row').forEach((row, i) => {
+      row.querySelector('.domain-input').name  = `domains[${i}][domain]`;
+      row.querySelector('.policy-select').name = `domains[${i}][policy]`;
+      updateRowPreview(row);
+    });
+  }
+
+  function updateRowPreview(row) {
+    const domain  = (row.querySelector('.domain-input').value || '').trim() || 'yourdomain.com';
+    const policy  = row.querySelector('.policy-select').value;
+    const mailbox = (document.getElementById('mailbox').value || '').trim() || ('dmarc@' + domain);
+    row.querySelector('.row-preview-name').textContent  = `_dmarc.${domain}`;
+    row.querySelector('.row-preview-value').textContent = `v=DMARC1; p=${policy}; rua=mailto:${mailbox};`;
+  }
+
+  // Update all previews when mailbox changes
+  document.getElementById('mailbox').addEventListener('input', () =>
+    document.querySelectorAll('#domainList .domain-row').forEach(updateRowPreview)
+  );
+
+  // Init previews for server-rendered rows
+  document.querySelectorAll('#domainList .domain-row').forEach(updateRowPreview);
+
+  function escAttr(s) {
+    return String(s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+</script>

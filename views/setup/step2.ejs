@@ -1,0 +1,37 @@
+<h4 class="fw-bold mb-1">Create administrator account</h4>
+<p class="text-secondary small mb-4">
+  This is a local account — not linked to Microsoft.<br>
+  It has full access including the danger zone.
+</p>
+
+<% if (error) { %>
+<div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-4">
+  <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+  <span><%= error %></span>
+</div>
+<% } %>
+
+<form method="post" action="/setup/2" novalidate>
+  <div class="mb-3">
+    <label class="form-label fw-medium" for="username">Username</label>
+    <input type="text" class="form-control" id="username" name="username"
+           placeholder="admin" autocomplete="username" required />
+    <div class="form-text">At least 3 characters. Used to sign in locally.</div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-medium" for="password">Password</label>
+    <input type="password" class="form-control" id="password" name="password"
+           placeholder="Min. 8 characters" autocomplete="new-password" required />
+  </div>
+
+  <div class="mb-4">
+    <label class="form-label fw-medium" for="confirmPassword">Confirm password</label>
+    <input type="password" class="form-control" id="confirmPassword" name="confirmPassword"
+           placeholder="Repeat the password" autocomplete="new-password" required />
+  </div>
+
+  <button type="submit" class="btn btn-success w-100 py-2 fw-semibold">
+    Create account <i class="bi bi-arrow-right ms-1"></i>
+  </button>
+</form>

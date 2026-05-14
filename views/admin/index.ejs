@@ -1,0 +1,69 @@
+<div class="d-flex align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">Admin Panel</h4>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-secondary small mb-1">Tenants</div>
+      <div class="fs-2 fw-bold"><%= stats.tenants %></div>
+      <a href="/admin/tenants" class="stretched-link"></a>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-secondary small mb-1">Users</div>
+      <div class="fs-2 fw-bold"><%= stats.users %></div>
+      <a href="/admin/users" class="stretched-link"></a>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-secondary small mb-1">DMARC Reports</div>
+      <div class="fs-2 fw-bold"><%= stats.reports %></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-secondary small mb-1">Local Admins</div>
+      <div class="fs-2 fw-bold"><%= stats.localAdmins %></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <h6 class="fw-semibold mb-2"><i class="bi bi-buildings me-2 text-success"></i>Tenants</h6>
+      <p class="text-secondary small mb-3">Add Office 365 tenants for DMARC monitoring. Optionally enable SSO login for users in those tenants.</p>
+      <a href="/admin/tenants" class="btn btn-sm btn-outline-success">Manage tenants</a>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <h6 class="fw-semibold mb-2"><i class="bi bi-people me-2 text-primary"></i>Users</h6>
+      <p class="text-secondary small mb-3">Manage local and SSO users. Assign <code>viewer</code> or <code>admin</code> roles.</p>
+      <a href="/admin/users" class="btn btn-sm btn-outline-primary">Manage users</a>
+    </div>
+  </div>
+  <% if (locals.user && user.role === 'local_admin') { %>
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <h6 class="fw-semibold mb-2"><i class="bi bi-shield-lock me-2 text-warning"></i>Two-factor auth</h6>
+      <p class="text-secondary small mb-3">
+        <%= stats.twoFaEnabled ? 'TOTP is enabled on your account.' : 'Add a TOTP authenticator for extra security.' %>
+      </p>
+      <a href="/admin/2fa" class="btn btn-sm <%= stats.twoFaEnabled ? 'btn-outline-secondary' : 'btn-outline-warning' %>">
+        <%= stats.twoFaEnabled ? 'Manage 2FA' : 'Enable 2FA' %>
+      </a>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 h-100 border-danger border-opacity-25">
+      <h6 class="fw-semibold mb-2 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Danger Zone</h6>
+      <p class="text-secondary small mb-3">Delete report data or reset the entire application. Irreversible.</p>
+      <a href="/admin/danger" class="btn btn-sm btn-outline-danger">Open danger zone</a>
+    </div>
+  </div>
+  <% } %>
+</div>

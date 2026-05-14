@@ -1,0 +1,39 @@
+<div class="d-flex align-items-center mb-4 gap-3">
+  <h4 class="mb-0 fw-bold">Settings</h4>
+</div>
+
+<% if (flash) { %>
+<div class="alert alert-success alert-dismissible py-2 mb-4" role="alert">
+  <i class="bi bi-check-circle me-1"></i><%= flash %>
+  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+</div>
+<% } %>
+
+<div class="row g-4" style="max-width:600px;">
+  <div class="col-12">
+    <form method="post" action="/admin/settings">
+      <div class="card p-4">
+        <h6 class="text-secondary small fw-semibold text-uppercase mb-3" style="letter-spacing:.05em;">
+          <i class="bi bi-clock me-2"></i>Fetch schedule
+        </h6>
+
+        <div class="mb-0">
+          <label class="form-label" for="fetch_interval_minutes">Global fetch interval</label>
+          <div class="input-group" style="max-width:220px;">
+            <input type="number" class="form-control" id="fetch_interval_minutes"
+                   name="fetch_interval_minutes" value="<%= globalInterval %>" min="5" max="1440" />
+            <span class="input-group-text text-secondary">minutes</span>
+          </div>
+          <div class="form-text">
+            How often the scheduler checks each tenant's mailbox for new DMARC reports.
+            Minimum 5 minutes. Individual tenants can override this value.
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-success mt-3 px-4">
+        <i class="bi bi-check-lg me-1"></i>Save settings
+      </button>
+    </form>
+  </div>
+</div>
