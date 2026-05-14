@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ report.domain }} — DMARC Report{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="/reports" class="text-secondary text-decoration-none small"><i class="bi bi-arrow-left me-1"></i>All reports</a>
+</div>
+
+<!-- Header -->
+<div class="row g-3 mb-4">
+  <div class="col-md-8">
+    <h4 class="fw-bold mb-1">{{ report.domain }}</h4>
+    <p class="text-secondary mb-0">
+      Report by <strong class="text-light">{{ report.org_name }}</strong>
+      &nbsp;·&nbsp; {{ report.begin_date.strftime('%Y-%m-%d') if report.begin_date else '?' }}
+      – {{ report.end_date.strftime('%Y-%m-%d') if report.end_date else '?' }}
+    </p>
+  </div>
+  <div class="col-md-4 text-md-end">
+    {% set rate = report.pass_rate %}
+    <span class="display-6 fw-bold {% if rate >= 98 %}pass-color{% elif rate >= 90 %}text-warning{% else %}fail-color{% endif %}">
+      {{ rate }}%
+    </span>
+    <div class="text-secondary small">pass rate</div>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3"><div class="card p-3 text-center">
+    <div class="text-secondary small mb-1">Total messages</div>
+    <div class="fs-3 fw-bold">{{ report.total_messages }}</div>
+  </div></div>
+  <div class="col-6 col-md-3"><div class="card p-3 text-center">
+    <div class="text-secondary small mb-1">Passed</div>
+    <div class="fs-3 fw-bold pass-color">{{ report.passed_messages }}</div>
+  </div></div>
+  <div class="col-6 col-md-3"><div class="card p-3 text-center">
+    <div class="text-secondary small mb-1">Failed</div>
+    <div class="fs-3 fw-bold fail-color">{{ report.failed_messages }}</div>
+  </div></div>
+  <div class="col-6 col-md-3"><div class="card p-3 text-center">
+    <div class="text-secondary small mb-1">Policy</div>
+    <div class="fs-3 fw-bold"><code>{{ report.policy_p }}</code></div>
+  </div></div>
+</div>
+
+<!-- Policy details -->
+<div class="card p-3 mb-4">
+  <h6 class="text-secondary mb-3">Published policy</h6>
+  <div class="row g-2 small">
+    <div class="col-6 col-md-2"><span class="text-secondary">Domain:</span><br><strong>{{ report.domain }}</strong></div>
+    <div class="col-6 col-md-2"><span class="text-secondary">p=</span><br><code>{{ report.policy_p }}</code></div>
+    <div class="col-6 col-md-2"><span class="text-secondary">sp=</span><br><code>{{ report.policy_sp or '—' }}</code></div>
+    <div class="col-6 col-md-2"><span class="text-secondary">pct=</span><br><code>{{ report.policy_pct }}%</code></div>
+    <div class="col-6 col-md-2"><span class="text-secondary">adkim=</span><br><code>{{ 'relaxed' if report.adkim == 'r' else 'strict' }}</code></div>
+    <div class="col-6 col-md-2"><span class="text-secondary">aspf=</span><br><code>{{ 'relaxed' if report.aspf == 'r' else 'strict' }}</code></div>
+  </div>
+</div>
+
+<!-- Record table -->
+<div class="card">
+  <div class="px-3 pt-3 pb-2 d-flex align-items-center">
+    <h6 class="text-secondary mb-0">Records ({{ report.records|length }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Source IP</th>
+          <th class="text-end">Count</th>
+          <th>DMARC</th>
+          <th>Disposition</th>
+          <th>DKIM aligned</th>
+          <th>SPF aligned</th>
+          <th>DKIM auth (domain)</th>
+          <th>SPF auth (domain)</th>
+          <th>Failure reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rec in report.records %}
+        <tr>
+          <td><code class="small">{{ rec.source_ip or '—' }}</code></td>
+          <td class="text-end">{{ rec.count }}</td>
+          <td>
+            {% if rec.dmarc_pass %}
+            <span class="badge badge-pass px-2 py-1">PASS</span>
+            {% else %}
+            <span class="badge badge-fail px-2 py-1">FAIL</span>
+            {% endif %}
+          </td>
+          <td><code class="small text-secondary">{{ rec.disposition }}</code></td>
+          <td>
+            <span class="small {% if rec.dkim_aligned == 'pass' %}pass-color{% else %}fail-color{% endif %}">
+              {{ rec.dkim_aligned or '—' }}
+            </span>
+          </td>
+          <td>
+            <span class="small {% if rec.spf_aligned == 'pass' %}pass-color{% else %}fail-color{% endif %}">
+              {{ rec.spf_aligned or '—' }}
+            </span>
+          </td>
+          <td class="small text-secondary">
+            {{ rec.dkim_auth_result or '—' }}
+            {% if rec.dkim_domain %}<span class="text-muted">({{ rec.dkim_domain }})</span>{% endif %}
+          </td>
+          <td class="small text-secondary">
+            {{ rec.spf_auth_result or '—' }}
+            {% if rec.spf_domain %}<span class="text-muted">({{ rec.spf_domain }})</span>{% endif %}
+          </td>
+          <td class="small {% if not rec.dmarc_pass %}fail-color{% else %}text-secondary{% endif %}">
+            {% if rec.failure_reason == 'dkim_and_spf' %}Both DKIM &amp; SPF failed
+            {% elif rec.failure_reason == 'dkim_only' %}DKIM alignment failed
+            {% elif rec.failure_reason == 'spf_only' %}SPF alignment failed
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
