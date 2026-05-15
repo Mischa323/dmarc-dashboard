@@ -16,37 +16,36 @@ A self-hosted dashboard that reads DMARC aggregate reports from a **Microsoft 36
 
 ---
 
-## Install with Docker (recommended)
+## Installation
 
-The Docker image is built automatically and published to the **GitHub Container Registry** on every commit. No build step needed.
+Choose the method that fits your setup:
 
-### 1. Create a working directory
+| Method | Best for |
+|---|---|
+| [Docker CLI](#-docker-cli) | Linux servers, NAS devices, quick installs |
+| [Portainer](#-portainer) | Portainer users who prefer a web UI |
+| [Node.js](#-nodejs-without-docker) | Development or servers without Docker |
+
+> **Session secret** — a cryptographically random secret is auto-generated on first start and saved to the persistent data volume. No manual setup required.
+
+---
+
+## 🐳 Docker CLI
+
+### 1. Download the compose file
 
 ```bash
 mkdir dmarc-dashboard && cd dmarc-dashboard
-```
-
-A session secret is **auto-generated** on first start and saved to the persistent volume (`/data/.secret`). No manual secret setup required.
-
-To use a **different port**, create a `.env` file:
-
-```env
-PORT=8443
-```
-
-If you need to set a specific secret (e.g. migrating from another install), add it to `.env`:
-
-```env
-SECRET=your-existing-secret-here
-```
-
-### 2. Download docker-compose.yml
-
-```bash
 curl -O https://raw.githubusercontent.com/Mischa323/dmarc-dashboard/master/docker-compose.yml
 ```
 
-Or copy it manually from the repository.
+### 2. (Optional) Create a `.env` file to customise the port
+
+```env
+PORT=3443
+```
+
+Skip this step to use the default port `3443`.
 
 ### 3. Start
 
@@ -54,38 +53,51 @@ Or copy it manually from the repository.
 docker compose up -d
 ```
 
-Docker pulls the pre-built image from GHCR and starts the container. No compilation required.
+Docker pulls the pre-built image from GHCR — no compilation needed.
 
 ### 4. Open the setup wizard
 
-Navigate to `https://localhost:3443` (or your chosen port) and follow the 3-step setup wizard to create the admin account and configure your first Microsoft 365 tenant.
+Go to `https://<your-host>:3443` and follow the 3-step wizard to create the admin account and connect your first Microsoft 365 tenant.
 
-> **Self-signed certificate** — the dashboard generates a self-signed TLS certificate on first start. Your browser will show a security warning; add a permanent exception or place the container behind a reverse proxy with a real certificate.
+> **Self-signed certificate** — the dashboard generates a self-signed TLS certificate on first start. Your browser will warn you; add a permanent exception or put the container behind a reverse proxy.
 
-### Reverse proxy (nginx / Traefik)
+### Updating
 
-Set `HTTP_MODE=1` in `.env` to run the server on plain HTTP. The session cookie `secure` flag and `trust proxy` setting are applied automatically.
+```bash
+docker compose pull && docker compose up -d
+```
+
+### Enable automatic updates (Watchtower)
+
+Add the following service to `docker-compose.yml` to have Watchtower automatically pull and restart the container whenever a new image is published:
+
+```yaml
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_POLL_INTERVAL: "86400"   # seconds — 86400 = every 24 hours
+    command: --label-enable
+```
+
+The `dmarc-dashboard` service already has the `watchtower.enable=true` label, so Watchtower will only manage this container.
+
+### Reverse proxy
+
+Set `HTTP_MODE=1` in `.env` to listen on plain HTTP (for nginx / Traefik terminating TLS):
 
 ```env
 PORT=3000
 HTTP_MODE=1
 ```
 
-### Data persistence
-
-All data — the SQLite database and TLS certificates — is stored in the Docker volume `dmarc_data` (mounted at `/data`). Data survives container restarts and updates.
-
-### Update to a new version
-
-```bash
-docker compose pull && docker compose up -d
-```
-
 ---
 
-## Install with Portainer
-
-Portainer lets you deploy and manage the dashboard through a web UI using a Docker Compose stack.
+## 📦 Portainer
 
 ### 1. Open Stacks
 
@@ -93,11 +105,11 @@ In Portainer, go to **Stacks → Add stack**.
 
 ### 2. Name the stack
 
-Give it a name such as `dmarc-dashboard`.
+Enter a name such as `dmarc-dashboard`.
 
-### 3. Paste the compose file
+### 3. Paste into the Web editor
 
-Select **Web editor** and paste the following:
+Copy the entire block below and paste it into the **Web editor**:
 
 ```yaml
 services:
@@ -109,11 +121,10 @@ services:
     volumes:
       - dmarc_data:/data
     environment:
-      # SECRET is auto-generated on first start — no manual setup needed.
-      # SECRET: "override-only-if-migrating"
       PORT: "3443"
       DATABASE_URL: "/data/dmarc.db"
       CERTS_DIR: "/data/certs"
+      # Uncomment the line below when running behind a reverse proxy (nginx/Traefik):
       # HTTP_MODE: "1"
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -122,48 +133,23 @@ volumes:
   dmarc_data:
 ```
 
-> To change the port, update **both** `3443:3443` (host:container) and the `PORT` environment variable to the same value.
+> To use a different port, change **both** `3443:3443` and `PORT: "3443"` to the same value.
 
-### 4. Set environment variables
+### 4. Deploy the stack
 
-Instead of editing the compose file directly, you can use Portainer's **Environment variables** section below the editor to set `SECRET` and `PORT` — this keeps secrets out of the stack definition.
+Click **Deploy the stack**. Portainer pulls the image, creates the `dmarc_data` volume, and starts the container.
 
-| Variable | Value |
-|---|---|
-| `SECRET` | Auto-generated on first start — only set this if migrating from another install |
-| `PORT` | `3443` (or your preferred port) |
+### 5. Open the setup wizard
 
-### 5. Deploy
-
-Click **Deploy the stack**. Portainer will pull the image, create the `dmarc_data` volume, and start the container.
-
-### 6. Open the setup wizard
-
-Navigate to `https://<your-host>:3443` and follow the setup wizard to create the admin account and configure your Microsoft 365 tenant.
+Go to `https://<your-host>:3443` and follow the 3-step wizard to create the admin account and connect your first Microsoft 365 tenant.
 
 ### Updating
 
-In Portainer go to **Stacks → dmarc-dashboard → Editor**, then click **Update the stack**. Portainer will pull the latest image and recreate the container while keeping the `dmarc_data` volume intact.
+Go to **Stacks → dmarc-dashboard**, click **Pull and redeploy**. The `dmarc_data` volume is preserved.
 
----
+### Enable automatic updates (Watchtower)
 
-## Automatic updates with Watchtower
-
-[Watchtower](https://containrrr.dev/watchtower/) monitors your running containers and automatically pulls and restarts them when a new image is published.
-
-> **Requirement:** Watchtower can only update containers that use a pre-built registry image. If you are building the image locally with `build: .`, Watchtower cannot help — use the manual update steps instead.
-
-### Enable Watchtower
-
-**Step 1** — Switch from a local build to a registry image in `docker-compose.yml`:
-
-```yaml
-services:
-  dmarc-dashboard:
-    image: ghcr.io/mischa323/dmarc-dashboard:latest   # ← replace "build: ."
-```
-
-**Step 2** — Uncomment the `watchtower` service block in `docker-compose.yml`:
+Add the Watchtower service to your stack in the Web editor so it sits alongside `dmarc-dashboard`:
 
 ```yaml
   watchtower:
@@ -172,65 +158,52 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      WATCHTOWER_LABEL_ENABLE: "true"      # only watch containers with the enable label
-      WATCHTOWER_CLEANUP: "true"           # remove old images after update
-      WATCHTOWER_POLL_INTERVAL: "86400"    # check every 24 hours (in seconds)
-      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_POLL_INTERVAL: "86400"   # seconds — 86400 = every 24 hours
     command: --label-enable
 ```
 
-The `dmarc-dashboard` service already has the label `com.centurylinklabs.watchtower.enable=true` in the compose file, so Watchtower will only manage that specific container and leave everything else on the host alone.
+Then click **Update the stack**. Watchtower will check for a new image every 24 hours and restart the container automatically.
 
-**Step 3** — Restart the stack:
+**Change the check interval:**
 
-```bash
-docker compose up -d
-```
-
-### Change the update interval
-
-Edit `WATCHTOWER_POLL_INTERVAL` in the watchtower environment block (value is in seconds):
-
-| Interval | Value |
+| Frequency | `WATCHTOWER_POLL_INTERVAL` |
 |---|---|
 | Every hour | `3600` |
 | Every 6 hours | `21600` |
-| Every 24 hours | `86400` (default) |
-
-### Watchtower in Portainer
-
-Add the watchtower service to your Portainer stack definition the same way — paste the block into the Web editor, then click **Update the stack**.
+| Every 24 hours | `86400` |
 
 ---
 
-## Install without Docker (Node.js)
+## 🟢 Node.js (without Docker)
 
 ### Requirements
 
 - Node.js 20+
-- A Microsoft Entra (Azure AD) app registration (see below)
+- A Microsoft Entra (Azure AD) app registration
 
 ### Steps
 
 ```bash
-# 1. Clone and install dependencies
+# 1. Clone and install
 git clone https://github.com/Mischa323/dmarc-dashboard.git
 cd dmarc-dashboard
 npm install
 
-# 2. Start the server — a .env file and self-signed TLS certificate are generated automatically
+# 2. Start — .env and a self-signed TLS certificate are generated automatically
 node server.js
 
 # 3. Open https://localhost:3443 and follow the setup wizard
 ```
 
-To change the port, set `PORT` before starting:
+To use a different port:
 
 ```bash
 PORT=8443 node server.js
 ```
 
-Or add it to the `.env` file that is auto-generated on first run.
+Or add `PORT=8443` to the `.env` file generated on first run.
 
 ---
 
@@ -244,43 +217,41 @@ Or add it to the `.env` file that is auto-generated on first run.
 4. Grant admin consent
 5. **Certificates & secrets → New client secret** — copy the value immediately
 6. Note the **Tenant ID** and **Application (client) ID** from the Overview page
-7. Enter these values in the dashboard's setup wizard or tenant configuration screen
+7. Enter these values in the dashboard's tenant configuration screen
 
-The app uses **client-credentials flow** (no interactive login required for mail fetching).
+The app uses **client-credentials flow** — no interactive user login required for mail fetching.
 
 ---
 
 ## Configuration
 
-These variables can be set in `.env` (standalone) or in `docker-compose.yml` / a Docker `.env` file.
-
 | Variable | Description | Default |
 |---|---|---|
 | `PORT` | Listening port | `3443` |
-| `SECRET` | Session secret (use a long random string) | auto-generated |
-| `DATABASE_URL` | Path to the SQLite database file | `dmarc.db` / `/data/dmarc.db` |
-| `CERTS_DIR` | Directory for TLS certificate and key | `./certs` / `/data/certs` |
-| `HTTP_MODE` | Set to `1` to listen on plain HTTP (reverse proxy mode) | — |
+| `SECRET` | Session secret | auto-generated, saved to `/data/.secret` |
+| `DATABASE_URL` | Path to the SQLite database | `dmarc.db` / `/data/dmarc.db` |
+| `CERTS_DIR` | Directory for TLS cert and key | `./certs` / `/data/certs` |
+| `HTTP_MODE` | Set to `1` for plain HTTP (reverse proxy mode) | — |
 
-Tenant credentials (Tenant ID, Client ID, Client Secret, mailbox address) are stored in the database and managed through the admin UI — they are not environment variables.
+Tenant credentials (Tenant ID, Client ID, Client Secret, mailbox) are stored in the database and managed via the Admin UI — not environment variables.
 
 ---
 
 ## DMARC DNS setup
 
-Point your domain's `rua` tag to the mailbox you configured:
+Point your domain's `rua` tag to the configured mailbox:
 
 ```
 _dmarc.yourdomain.com  TXT  "v=DMARC1; p=reject; rua=mailto:dmarc@yourdomain.com"
 ```
 
-If the reporting mailbox is on a **different domain** than the monitored domain, you also need an authorisation record (RFC 7489 §7.1):
+If the reporting mailbox is on a **different domain** than the monitored domain, add an authorisation record (RFC 7489 §7.1):
 
 ```
 yourdomain.com._report._dmarc.mailboxdomain.com  TXT  "v=DMARC1;"
 ```
 
-The dashboard's DNS health check will detect this and show the exact record to add.
+The dashboard's DNS health check detects missing authorisation records and shows the exact record to add.
 
 ---
 
@@ -291,7 +262,7 @@ dmarc-dashboard/
 ├── server.js              Entry point — starts HTTPS/HTTP server
 ├── src/
 │   ├── app.js             Express app factory
-│   ├── config.js          Environment config and .env generation
+│   ├── config.js          Environment config, secret and .env generation
 │   ├── db.js              SQLite schema, migrations, helpers
 │   ├── dmarcParser.js     RFC 7489 XML parser
 │   ├── fetcher.js         Fetch and persist reports
