@@ -111,6 +111,35 @@ function _createSchema(db) {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- Email report groups
+    CREATE TABLE IF NOT EXISTS email_report_groups (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      name             TEXT NOT NULL,
+      schedule         TEXT DEFAULT 'weekly',
+      send_time        TEXT DEFAULT '08:00',
+      send_day         INTEGER DEFAULT 1,
+      transport        TEXT DEFAULT 'smtp',
+      graph_tenant_id  INTEGER REFERENCES sso_tenants(id) ON DELETE SET NULL,
+      smtp_host        TEXT,
+      smtp_port        INTEGER DEFAULT 587,
+      smtp_secure      INTEGER DEFAULT 0,
+      smtp_user        TEXT,
+      smtp_pass        TEXT,
+      smtp_from        TEXT,
+      domains_filter   TEXT DEFAULT 'all',
+      enabled          INTEGER DEFAULT 1,
+      last_sent_daily  TEXT,
+      last_sent_weekly TEXT,
+      created_at       TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS email_report_recipients (
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL REFERENCES email_report_groups(id) ON DELETE CASCADE,
+      email    TEXT NOT NULL,
+      UNIQUE(group_id, email)
+    );
   `);
 }
 

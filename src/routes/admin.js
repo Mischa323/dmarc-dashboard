@@ -334,6 +334,171 @@ router.post('/2fa/disable', requireLocalAdmin, (req, res) => {
   res.redirect('/admin/2fa');
 });
 
+// ── Email report groups ─────────────────────────────────────────────────────
+
+function loadGroupWithRecipients(db, id) {
+  const group = db.prepare('SELECT * FROM email_report_groups WHERE id = ?').get(id);
+  if (!group) return null;
+  group.recipients = db.prepare('SELECT email FROM email_report_recipients WHERE group_id = ? ORDER BY id').all(id).map(r => r.email);
+  try { group.domains_list = group.domains_filter === 'all' ? [] : JSON.parse(group.domains_filter); } catch { group.domains_list = []; }
+  return group;
+}
+
+function saveRecipients(db, groupId, emails) {
+  db.prepare('DELETE FROM email_report_recipients WHERE group_id = ?').run(groupId);
+  const ins = db.prepare('INSERT OR IGNORE INTO email_report_recipients (group_id, email) VALUES (?, ?)');
+  for (const email of (emails || [])) {
+    const e = email.trim();
+    if (e) ins.run(groupId, e);
+  }
+}
+
+router.get('/email-reports', (req, res) => {
+  const db = getDb();
+  const groups = db.prepare('SELECT * FROM email_report_groups ORDER BY name').all();
+  for (const g of groups) {
+    g.recipient_count = db.prepare('SELECT COUNT(*) as n FROM email_report_recipients WHERE group_id = ?').get(g.id).n;
+  }
+  const flash = req.session.flash || null;
+  delete req.session.flash;
+  res.render('admin/email_reports', { title: 'Email Reports', path: '/admin', groups, flash });
+});
+
+router.get('/email-reports/new', (req, res) => {
+  const db = getDb();
+  const tenants = db.prepare('SELECT id, name FROM sso_tenants WHERE enabled = 1 ORDER BY name').all();
+  const domains = db.prepare('SELECT DISTINCT domain FROM reports ORDER BY domain').all().map(r => r.domain);
+  res.render('admin/email_report_form', {
+    title: 'New Email Report', path: '/admin', error: null, tenants, domains,
+    group: {
+      id: null, name: '', schedule: 'weekly', send_time: '08:00', send_day: 1,
+      transport: 'smtp', graph_tenant_id: null,
+      smtp_host: '', smtp_port: 587, smtp_secure: 0, smtp_user: '', smtp_pass: '', smtp_from: '',
+      domains_filter: 'all', domains_list: [], enabled: 1, recipients: [],
+    },
+  });
+});
+
+router.post('/email-reports', async (req, res) => {
+  const db = getDb();
+  const tenants = db.prepare('SELECT id, name FROM sso_tenants WHERE enabled = 1 ORDER BY name').all();
+  const domains = db.prepare('SELECT DISTINCT domain FROM reports ORDER BY domain').all().map(r => r.domain);
+
+  const { name, schedule, send_time, transport, smtp_host, smtp_user, smtp_pass, smtp_from } = req.body;
+  const send_day = parseInt(req.body.send_day) || 1;
+  const smtp_port = parseInt(req.body.smtp_port) || 587;
+  const smtp_secure = req.body.smtp_secure === '1' ? 1 : 0;
+  const graph_tenant_id = req.body.graph_tenant_id ? parseInt(req.body.graph_tenant_id) : null;
+  const domainsFilter = req.body.domains_all === '1' ? 'all' : JSON.stringify([].concat(req.body.selected_domains || []).filter(Boolean));
+  const emails = [].concat(req.body.recipients || []).filter(e => e.trim());
+
+  const fail = (msg) => res.render('admin/email_report_form', {
+    title: 'New Email Report', path: '/admin', error: msg, tenants, domains,
+    group: { ...req.body, id: null, recipients: emails, domains_list: [], send_day, smtp_port, smtp_secure, graph_tenant_id },
+  });
+
+  if (!name) return fail('Name is required.');
+  if (transport === 'smtp' && !smtp_host) return fail('SMTP host is required for SMTP transport.');
+  if (transport === 'graph' && !graph_tenant_id) return fail('Select a tenant for Graph API transport.');
+  if (!emails.length) return fail('Add at least one recipient email address.');
+
+  const r = db.prepare(`
+    INSERT INTO email_report_groups
+      (name, schedule, send_time, send_day, transport, graph_tenant_id,
+       smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, smtp_from, domains_filter)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, schedule, send_time || '08:00', send_day, transport, graph_tenant_id,
+         smtp_host || null, smtp_port, smtp_secure, smtp_user || null, smtp_pass || null,
+         smtp_from || null, domainsFilter);
+
+  saveRecipients(db, r.lastInsertRowid, emails);
+  req.session.flash = `Email report group "${name}" created.`;
+  res.redirect('/admin/email-reports');
+});
+
+router.get('/email-reports/:id/edit', (req, res) => {
+  const db = getDb();
+  const group = loadGroupWithRecipients(db, req.params.id);
+  if (!group) return res.status(404).render('error', { layout: 'layout', title: 'Not Found', message: 'Group not found.' });
+  const tenants = db.prepare('SELECT id, name FROM sso_tenants WHERE enabled = 1 ORDER BY name').all();
+  const domains = db.prepare('SELECT DISTINCT domain FROM reports ORDER BY domain').all().map(r => r.domain);
+  res.render('admin/email_report_form', { title: 'Edit Email Report', path: '/admin', error: null, tenants, domains, group });
+});
+
+router.post('/email-reports/:id', (req, res) => {
+  const db = getDb();
+  const existing = db.prepare('SELECT id FROM email_report_groups WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).send('Not found');
+
+  const { name, schedule, send_time, transport, smtp_host, smtp_user, smtp_pass, smtp_from } = req.body;
+  const send_day = parseInt(req.body.send_day) || 1;
+  const smtp_port = parseInt(req.body.smtp_port) || 587;
+  const smtp_secure = req.body.smtp_secure === '1' ? 1 : 0;
+  const graph_tenant_id = req.body.graph_tenant_id ? parseInt(req.body.graph_tenant_id) : null;
+  const domainsFilter = req.body.domains_all === '1' ? 'all' : JSON.stringify([].concat(req.body.selected_domains || []).filter(Boolean));
+  const emails = [].concat(req.body.recipients || []).filter(e => e.trim());
+  const tenants = db.prepare('SELECT id, name FROM sso_tenants WHERE enabled = 1 ORDER BY name').all();
+  const domains = db.prepare('SELECT DISTINCT domain FROM reports ORDER BY domain').all().map(r => r.domain);
+
+  const fail = (msg) => res.render('admin/email_report_form', {
+    title: 'Edit Email Report', path: '/admin', error: msg, tenants, domains,
+    group: { ...req.body, id: req.params.id, recipients: emails, domains_list: [], send_day, smtp_port, smtp_secure, graph_tenant_id },
+  });
+
+  if (!name) return fail('Name is required.');
+  if (transport === 'smtp' && !smtp_host) return fail('SMTP host is required for SMTP transport.');
+  if (transport === 'graph' && !graph_tenant_id) return fail('Select a tenant for Graph API transport.');
+  if (!emails.length) return fail('Add at least one recipient email address.');
+
+  // Keep existing password if blank
+  const existingFull = db.prepare('SELECT smtp_pass FROM email_report_groups WHERE id = ?').get(req.params.id);
+  const finalPass = (smtp_pass && smtp_pass.trim()) ? smtp_pass.trim() : existingFull.smtp_pass;
+
+  db.prepare(`
+    UPDATE email_report_groups SET
+      name=?, schedule=?, send_time=?, send_day=?, transport=?, graph_tenant_id=?,
+      smtp_host=?, smtp_port=?, smtp_secure=?, smtp_user=?, smtp_pass=?, smtp_from=?, domains_filter=?
+    WHERE id=?
+  `).run(name, schedule, send_time || '08:00', send_day, transport, graph_tenant_id,
+         smtp_host || null, smtp_port, smtp_secure, smtp_user || null, finalPass,
+         smtp_from || null, domainsFilter, req.params.id);
+
+  saveRecipients(db, req.params.id, emails);
+  req.session.flash = `Email report group "${name}" updated.`;
+  res.redirect('/admin/email-reports');
+});
+
+router.post('/email-reports/:id/toggle', (req, res) => {
+  const db = getDb();
+  const group = db.prepare('SELECT enabled FROM email_report_groups WHERE id = ?').get(req.params.id);
+  if (!group) return res.status(404).send('Not found');
+  db.prepare('UPDATE email_report_groups SET enabled = ? WHERE id = ?').run(group.enabled ? 0 : 1, req.params.id);
+  res.redirect('/admin/email-reports');
+});
+
+router.post('/email-reports/:id/delete', (req, res) => {
+  const db = getDb();
+  const group = db.prepare('SELECT name FROM email_report_groups WHERE id = ?').get(req.params.id);
+  db.prepare('DELETE FROM email_report_groups WHERE id = ?').run(req.params.id);
+  req.session.flash = group ? `Email report group "${group.name}" deleted.` : 'Group deleted.';
+  res.redirect('/admin/email-reports');
+});
+
+router.post('/email-reports/:id/send', async (req, res) => {
+  const db = getDb();
+  const group = loadGroupWithRecipients(db, req.params.id);
+  if (!group) return res.status(404).json({ error: 'Not found' });
+
+  const period = req.body.period === 'weekly' ? 'weekly' : 'daily';
+  try {
+    const { sendGroupReport } = require('../reportMailer');
+    const result = await sendGroupReport(group, db, period);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Danger zone (local admin only) ─────────────────────────────────────────
 
 router.get('/danger', requireLocalAdmin, (req, res) => {
