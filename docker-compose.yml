@@ -10,8 +10,9 @@ services:
     volumes:
       - dmarc_data:/data
     environment:
-      # Generate a strong random value — never leave the default in production.
-      SECRET: "${SECRET:-change-me-to-a-random-64-char-string}"
+      # SECRET is auto-generated and persisted to /data/.secret on first start.
+      # Override only if you need a specific value (e.g. migrating from another install).
+      # SECRET: "your-custom-secret-here"
       PORT: "${PORT:-3443}"
       DATABASE_URL: "/data/dmarc.db"
       CERTS_DIR: "/data/certs"

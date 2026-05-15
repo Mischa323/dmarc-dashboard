@@ -1,6 +1,7 @@
-const { ensureEnvFile } = require('./src/config');
-ensureEnvFile();            // create .env with PORT/SECRET if missing
+const { ensureEnvFile, ensureSecret } = require('./src/config');
+ensureEnvFile();            // create .env with PORT/SECRET if missing (standalone mode)
 require('dotenv').config(); // load it into process.env
+ensureSecret();             // auto-generate and persist secret if still missing or placeholder
 
 const https = require('https');
 const http  = require('http');

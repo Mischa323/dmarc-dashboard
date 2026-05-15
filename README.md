@@ -20,27 +20,25 @@ A self-hosted dashboard that reads DMARC aggregate reports from a **Microsoft 36
 
 The Docker image is built automatically and published to the **GitHub Container Registry** on every commit. No build step needed.
 
-### 1. Create a working directory and environment file
+### 1. Create a working directory
 
 ```bash
 mkdir dmarc-dashboard && cd dmarc-dashboard
 ```
 
-Create a `.env` file:
+A session secret is **auto-generated** on first start and saved to the persistent volume (`/data/.secret`). No manual secret setup required.
+
+To use a **different port**, create a `.env` file:
 
 ```env
-SECRET=replace-with-a-random-64-character-string
-PORT=3443
+PORT=8443
 ```
 
-Generate a secure secret:
-```bash
-openssl rand -hex 32
-# or with Node.js:
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+If you need to set a specific secret (e.g. migrating from another install), add it to `.env`:
 
-To use a **different port**, change `PORT` in `.env`. Both the host binding and the container update automatically.
+```env
+SECRET=your-existing-secret-here
+```
 
 ### 2. Download docker-compose.yml
 
@@ -111,7 +109,8 @@ services:
     volumes:
       - dmarc_data:/data
     environment:
-      SECRET: "replace-with-a-random-64-character-string"
+      # SECRET is auto-generated on first start — no manual setup needed.
+      # SECRET: "override-only-if-migrating"
       PORT: "3443"
       DATABASE_URL: "/data/dmarc.db"
       CERTS_DIR: "/data/certs"
@@ -131,16 +130,8 @@ Instead of editing the compose file directly, you can use Portainer's **Environm
 
 | Variable | Value |
 |---|---|
-| `SECRET` | A random 64-character string (see generation command below) |
+| `SECRET` | Auto-generated on first start — only set this if migrating from another install |
 | `PORT` | `3443` (or your preferred port) |
-
-Generate a secret on any machine with Node.js or OpenSSL:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-# or
-openssl rand -hex 32
-```
 
 ### 5. Deploy
 
