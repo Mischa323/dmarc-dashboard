@@ -92,7 +92,9 @@
               </button>
               <% if (t.domains && t.domains.length > 0) { %>
               <button class="btn btn-sm btn-outline-secondary" type="button"
-                      onclick="showRecords(<%- JSON.stringify(t.domains) %>, '<%= t.mailbox.replace(/'/g,"\\'"  ) %>')">
+                      data-domains="<%- JSON.stringify(t.domains).replace(/"/g, '&quot;') %>"
+                      data-mailbox="<%= t.mailbox %>"
+                      onclick="showRecordsFromBtn(this)">
                 <i class="bi bi-file-text me-1"></i>Records
               </button>
               <% } %>
@@ -207,36 +209,78 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  function showRecordsFromBtn(btn) {
+    showRecords(JSON.parse(btn.dataset.domains), btn.dataset.mailbox);
+  }
+
+  function recordRow(label, name, value) {
+    const inputStyle = 'background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.85);';
+    const lblStyle   = 'letter-spacing:.05em;font-size:.7rem;';
+    return `
+      <div class="mb-1">
+        <p class="text-secondary fw-semibold text-uppercase mb-2" style="${lblStyle}">${escHtml(label)}</p>
+        <div class="mb-2">
+          <div class="text-secondary mb-1" style="font-size:.75rem;">Name</div>
+          <div class="d-flex gap-2">
+            <input type="text" class="form-control font-monospace form-control-sm" style="${inputStyle}" readonly value="${escHtml(name)}" />
+            <button class="btn btn-sm btn-outline-secondary flex-shrink-0" onclick="copyInput(this)"><i class="bi bi-clipboard"></i></button>
+          </div>
+        </div>
+        <div>
+          <div class="text-secondary mb-1" style="font-size:.75rem;">Value</div>
+          <div class="d-flex gap-2">
+            <input type="text" class="form-control font-monospace form-control-sm" style="${inputStyle}" readonly value="${escHtml(value)}" />
+            <button class="btn btn-sm btn-outline-secondary flex-shrink-0" onclick="copyInput(this)"><i class="bi bi-clipboard"></i></button>
+          </div>
+        </div>
+      </div>`;
+  }
+
   function showRecords(domains, mailbox) {
+    const mailboxDomain = (mailbox.split('@')[1] || '').toLowerCase();
     const container = document.getElementById('modalRecords');
+
     container.innerHTML = domains.map(d => {
-      const name  = `_dmarc.${d.domain}`;
-      const value = `v=DMARC1; p=${d.dmarc_policy || 'none'}; rua=mailto:${mailbox};`;
+      const monitoredDomain = d.domain.toLowerCase();
+      const dmarcName  = `_dmarc.${d.domain}`;
+      const dmarcValue = `v=DMARC1; p=${d.dmarc_policy || 'none'}; rua=mailto:${mailbox};`;
+      const crossDomain = mailboxDomain && mailboxDomain !== monitoredDomain;
+      const authName  = crossDomain ? `${d.domain}._report._dmarc.${mailboxDomain}` : null;
+      const authValue = `v=DMARC1;`;
+
       return `
         <div class="mb-4">
-          <div class="fw-semibold small text-light mb-2">${escHtml(d.domain)}</div>
-          <div class="mb-2">
-            <label class="form-label small text-secondary fw-semibold text-uppercase mb-1" style="letter-spacing:.05em;font-size:.7rem;">Name (TXT)</label>
-            <div class="d-flex gap-2">
-              <input type="text" class="form-control font-monospace form-control-sm"
-                     style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.85);" readonly value="${escHtml(name)}" />
-              <button class="btn btn-sm btn-outline-secondary flex-shrink-0" onclick="copyInput(this)">
-                <i class="bi bi-clipboard"></i>
-              </button>
-            </div>
+          <div class="fw-semibold small text-light mb-3">
+            <i class="bi bi-globe2 me-1 text-secondary"></i>${escHtml(d.domain)}
           </div>
-          <div>
-            <label class="form-label small text-secondary fw-semibold text-uppercase mb-1" style="letter-spacing:.05em;font-size:.7rem;">Value</label>
-            <div class="d-flex gap-2">
-              <input type="text" class="form-control font-monospace form-control-sm"
-                     style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.85);" readonly value="${escHtml(value)}" />
-              <button class="btn btn-sm btn-outline-secondary flex-shrink-0" onclick="copyInput(this)">
-                <i class="bi bi-clipboard"></i>
-              </button>
+
+          <p class="text-secondary mb-2" style="font-size:.8rem;">
+            Add this record to the DNS of <strong class="text-light">${escHtml(d.domain)}</strong>:
+          </p>
+          ${recordRow('DMARC policy record — value', dmarcName, dmarcValue)}
+
+          ${crossDomain ? `
+          <div class="alert mt-3 mb-0 py-2 px-3" style="background:rgba(255,159,10,.08);border:1px solid rgba(255,159,10,.22);border-radius:12px;">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-exclamation-triangle-fill" style="color:#ff9f0a;"></i>
+              <span class="fw-semibold" style="color:#ff9f0a;font-size:.85rem;">Cross-domain authorisation required</span>
             </div>
-          </div>
+            <p class="text-secondary mb-2" style="font-size:.8rem;">
+              Your <code>rua</code> address (<code>${escHtml(mailbox)}</code>) is on
+              <strong class="text-light">${escHtml(mailboxDomain)}</strong>, which is a different domain than
+              <strong class="text-light">${escHtml(d.domain)}</strong>.
+              RFC 7489 §7.1 requires an authorisation record on <strong class="text-light">${escHtml(mailboxDomain)}</strong>
+              to allow it to receive reports for <strong class="text-light">${escHtml(d.domain)}</strong>.
+              Without it, most senders will silently discard the reports.
+            </p>
+            <p class="text-secondary mb-2" style="font-size:.8rem;">
+              Add this record to the DNS of <strong class="text-light">${escHtml(mailboxDomain)}</strong>:
+            </p>
+            ${recordRow('Cross-domain authorisation record — value', authName, authValue)}
+          </div>` : ''}
         </div>`;
     }).join('<hr style="border-color:rgba(255,255,255,.07);">');
+
     new bootstrap.Modal(document.getElementById('recordModal')).show();
   }
 
