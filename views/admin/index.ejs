@@ -46,13 +46,6 @@
       <a href="/admin/users" class="btn btn-sm btn-outline-primary">Manage users</a>
     </div>
   </div>
-  <div class="col-md-4">
-    <div class="card p-3 h-100">
-      <h6 class="fw-semibold mb-2"><i class="bi bi-envelope-paper me-2" style="color:#bf5af2;"></i>Email Reports</h6>
-      <p class="text-secondary small mb-3">Send scheduled DMARC summaries by email. Configure recipient groups, schedule, and transport (SMTP or Graph).</p>
-      <a href="/admin/email-reports" class="btn btn-sm btn-outline-secondary">Manage email reports</a>
-    </div>
-  </div>
   <% if (locals.user && user.role === 'local_admin') { %>
   <div class="col-md-4">
     <div class="card p-3 h-100">

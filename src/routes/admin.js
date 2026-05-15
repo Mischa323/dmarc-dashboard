@@ -280,7 +280,11 @@ router.get('/settings', requireLocalAdmin, (req, res) => {
   const globalInterval = parseInt(getSetting(db, 'fetch_interval_minutes', '60')) || 60;
   const flash = req.session.flash || null;
   delete req.session.flash;
-  res.render('admin/settings', { title: 'Settings', path: '/admin', globalInterval, flash });
+  const emailGroups = db.prepare('SELECT * FROM email_report_groups ORDER BY name').all();
+  for (const g of emailGroups) {
+    g.recipient_count = db.prepare('SELECT COUNT(*) as n FROM email_report_recipients WHERE group_id = ?').get(g.id).n;
+  }
+  res.render('admin/settings', { title: 'Settings', path: '/admin', globalInterval, flash, emailGroups });
 });
 
 router.post('/settings', requireLocalAdmin, (req, res) => {
