@@ -1,14 +1,60 @@
-<div class="d-flex align-items-center mb-4 gap-3">
+<div class="d-flex align-items-center mb-3 gap-3">
   <h4 class="mb-0 fw-bold">Reports</h4>
   <form class="d-flex gap-2 ms-auto" method="get">
     <input type="text" name="domain" class="form-control form-control-sm"
-           placeholder="Filter by domain" value="<%= selectedDomain %>">
+           placeholder="Filter by domain" value="<%= activeFilters.domain %>">
     <button type="submit" class="btn btn-sm btn-outline-secondary">Filter</button>
-    <% if (selectedDomain) { %>
-    <a href="/reports" class="btn btn-sm btn-outline-danger">Clear</a>
+    <% if (Object.values(activeFilters).some(v => v)) { %>
+    <a href="/reports" class="btn btn-sm btn-outline-danger">Clear all</a>
     <% } %>
   </form>
 </div>
+
+<% if (Object.values(activeFilters).some(v => v)) { %>
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <% if (activeFilters.status) { %>
+  <% const statusParams = new URLSearchParams(filterQuery); statusParams.delete('status'); %>
+  <span class="badge d-flex align-items-center gap-1 px-2 py-1"
+        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);font-size:.8rem;">
+    Status: <%= activeFilters.status %>
+    <a href="/reports?<%= statusParams.toString() %>" class="text-secondary ms-1" style="line-height:1;">&times;</a>
+  </span>
+  <% } %>
+  <% if (activeFilters.date) { %>
+  <% const dateParams = new URLSearchParams(filterQuery); dateParams.delete('date'); %>
+  <span class="badge d-flex align-items-center gap-1 px-2 py-1"
+        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);font-size:.8rem;">
+    Date: <%= activeFilters.date %>
+    <a href="/reports?<%= dateParams.toString() %>" class="text-secondary ms-1" style="line-height:1;">&times;</a>
+  </span>
+  <% } %>
+  <% if (activeFilters.ip) { %>
+  <% const ipParams = new URLSearchParams(filterQuery); ipParams.delete('ip'); %>
+  <span class="badge d-flex align-items-center gap-1 px-2 py-1"
+        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);font-size:.8rem;">
+    IP: <%= activeFilters.ip %>
+    <a href="/reports?<%= ipParams.toString() %>" class="text-secondary ms-1" style="line-height:1;">&times;</a>
+  </span>
+  <% } %>
+  <% if (activeFilters.org) { %>
+  <% const orgParams = new URLSearchParams(filterQuery); orgParams.delete('org'); %>
+  <span class="badge d-flex align-items-center gap-1 px-2 py-1"
+        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);font-size:.8rem;">
+    Org: <%= activeFilters.org %>
+    <a href="/reports?<%= orgParams.toString() %>" class="text-secondary ms-1" style="line-height:1;">&times;</a>
+  </span>
+  <% } %>
+  <% if (activeFilters.domain) { %>
+  <% const domainParams = new URLSearchParams(filterQuery); domainParams.delete('domain'); %>
+  <span class="badge d-flex align-items-center gap-1 px-2 py-1"
+        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);font-size:.8rem;">
+    Domain: <%= activeFilters.domain %>
+    <a href="/reports?<%= domainParams.toString() %>" class="text-secondary ms-1" style="line-height:1;">&times;</a>
+  </span>
+  <% } %>
+  <small class="text-secondary align-self-center"><%= total %> result<%= total !== 1 ? 's' : '' %></small>
+</div>
+<% } %>
 
 <div class="card">
   <div class="table-responsive">
@@ -60,19 +106,20 @@
 <% if (totalPages > 1) { %>
 <nav class="mt-3">
   <ul class="pagination pagination-sm justify-content-center">
+    <% const pgBase = filterQuery ? '?' + filterQuery + '&page=' : '?page='; %>
     <% if (page > 1) { %>
     <li class="page-item">
-      <a class="page-link" href="?page=<%= page - 1 %>&domain=<%= selectedDomain %>">Previous</a>
+      <a class="page-link" href="<%= pgBase %><%= page - 1 %>">Previous</a>
     </li>
     <% } %>
     <% for (let p = Math.max(1, page - 2); p <= Math.min(totalPages, page + 2); p++) { %>
     <li class="page-item <%= p === page ? 'active' : '' %>">
-      <a class="page-link" href="?page=<%= p %>&domain=<%= selectedDomain %>"><%= p %></a>
+      <a class="page-link" href="<%= pgBase %><%= p %>"><%= p %></a>
     </li>
     <% } %>
     <% if (page < totalPages) { %>
     <li class="page-item">
-      <a class="page-link" href="?page=<%= page + 1 %>&domain=<%= selectedDomain %>">Next</a>
+      <a class="page-link" href="<%= pgBase %><%= page + 1 %>">Next</a>
     </li>
     <% } %>
   </ul>

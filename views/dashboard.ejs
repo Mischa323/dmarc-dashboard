@@ -70,9 +70,11 @@ function buildSummaryCards(s) {
   const passRate = s.pass_rate;
   const rateCard = passRate >= 98 ? 'card-pass' : passRate >= 90 ? 'card-warn' : 'card-fail';
   const rateColor = passRate >= 98 ? 'var(--clr-pass)' : passRate >= 90 ? 'var(--clr-warn)' : 'var(--clr-fail)';
+  const clickStyle = 'cursor:pointer;';
+  const nav = (url) => `onclick="location.href='${url}'"`;
 
   document.getElementById('summaryCards').innerHTML = `
-    <div class="col-6 col-md-4 col-xl-2"><div class="card p-3 stat-card text-center">
+    <div class="col-6 col-md-4 col-xl-2"><div class="card p-3 stat-card text-center" style="${clickStyle}" ${nav('/reports')} title="View all reports">
       <div class="text-secondary small mb-1">Reports</div>
       <div class="display-6">${s.total_reports}</div>
     </div></div>
@@ -80,11 +82,11 @@ function buildSummaryCards(s) {
       <div class="text-secondary small mb-1">Total messages</div>
       <div class="display-6">${s.total_messages.toLocaleString()}</div>
     </div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card card-pass p-3 stat-card text-center">
+    <div class="col-6 col-md-4 col-xl-2"><div class="card card-pass p-3 stat-card text-center" style="${clickStyle}" ${nav('/reports?status=pass')} title="View passing reports">
       <div class="small mb-1" style="color:rgba(var(--clr-pass-rgb),.65);">Passed</div>
       <div class="display-6 pass-color">${s.pass_count.toLocaleString()}</div>
     </div></div>
-    <div class="col-6 col-md-4 col-xl-2"><div class="card card-fail p-3 stat-card text-center">
+    <div class="col-6 col-md-4 col-xl-2"><div class="card card-fail p-3 stat-card text-center" style="${clickStyle}" ${nav('/reports?status=fail')} title="View failing reports">
       <div class="small mb-1" style="color:rgba(var(--clr-fail-rgb),.65);">Failed</div>
       <div class="display-6 fail-color">${s.fail_count.toLocaleString()}</div>
     </div></div>
@@ -106,7 +108,16 @@ function buildResultPie(s) {
       labels: ['Pass', 'Fail'],
       datasets: [{ data: [s.pass_count, s.fail_count], backgroundColor: [cssClr('--clr-pass-rgb'), cssClr('--clr-fail-rgb')], borderWidth: 0 }]
     },
-    options: { plugins: { legend: { position: 'bottom' } }, cutout: '65%' }
+    options: {
+      plugins: { legend: { position: 'bottom' } },
+      cutout: '65%',
+      onClick(evt, elements) {
+        if (!elements.length) return;
+        const status = elements[0].index === 0 ? 'pass' : 'fail';
+        location.href = '/reports?status=' + status;
+      },
+      onHover(evt, elements) { evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; }
+    }
   });
 }
 
@@ -121,7 +132,8 @@ function buildTrendLine(trend, domainTrends, domainColors) {
   const domains = Object.keys(domainTrends || {});
   let datasets;
 
-  if (domains.length > 1) {
+  const multiDomain = domains.length > 1;
+  if (multiDomain) {
     datasets = domains.map(domain => {
       const color = (domainColors || {})[domain] || '#0a84ff';
       return {
@@ -140,13 +152,27 @@ function buildTrendLine(trend, domainTrends, domainColors) {
     ];
   }
 
+  const trendLabels = trend.map(d => d.date);
+
   charts['trendLine'] = new Chart(document.getElementById('trendLine'), {
     type: 'bar',
-    data: { labels: trend.map(d => d.date), datasets },
+    data: { labels: trendLabels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-      plugins: { legend: { position: 'top' } }
+      plugins: { legend: { position: 'top' } },
+      onClick(evt, elements) {
+        if (!elements.length) return;
+        const idx = elements[0].index;
+        const date = trendLabels[idx];
+        if (multiDomain) {
+          const domain = datasets[elements[0].datasetIndex].label;
+          location.href = '/reports?domain=' + encodeURIComponent(domain) + '&date=' + encodeURIComponent(date);
+        } else {
+          location.href = '/reports?date=' + encodeURIComponent(date);
+        }
+      },
+      onHover(evt, elements) { evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; }
     }
   });
 }
@@ -166,10 +192,11 @@ function buildFailureDoughnut(f) {
 function buildIpBar(sources) {
   destroyChart('ipBar');
   const top = sources.slice(0, 10);
+  const ipLabels = top.map(s => s.ip);
   charts['ipBar'] = new Chart(document.getElementById('ipBar'), {
     type: 'bar',
     data: {
-      labels: top.map(s => s.ip),
+      labels: ipLabels,
       datasets: [
         { label: 'Pass', data: top.map(s => s.pass), backgroundColor: cssClr('--clr-pass-rgb', .55), stack: 'a' },
         { label: 'Fail', data: top.map(s => s.fail), backgroundColor: cssClr('--clr-fail-rgb', .55), stack: 'a' }
@@ -178,17 +205,23 @@ function buildIpBar(sources) {
     options: {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
       scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } },
-      plugins: { legend: { position: 'top' } }
+      plugins: { legend: { position: 'top' } },
+      onClick(evt, elements) {
+        if (!elements.length) return;
+        location.href = '/reports?ip=' + encodeURIComponent(ipLabels[elements[0].index]);
+      },
+      onHover(evt, elements) { evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; }
     }
   });
 }
 
 function buildOrgBar(orgs) {
   destroyChart('orgBar');
+  const orgLabels = orgs.map(o => o.org);
   charts['orgBar'] = new Chart(document.getElementById('orgBar'), {
     type: 'bar',
     data: {
-      labels: orgs.map(o => o.org),
+      labels: orgLabels,
       datasets: [
         { label: 'Pass', data: orgs.map(o => o.pass), backgroundColor: cssClr('--clr-pass-rgb', .55), stack: 'a' },
         { label: 'Fail', data: orgs.map(o => o.fail), backgroundColor: cssClr('--clr-fail-rgb', .55), stack: 'a' }
@@ -197,7 +230,12 @@ function buildOrgBar(orgs) {
     options: {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
       scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } },
-      plugins: { legend: { position: 'top' } }
+      plugins: { legend: { position: 'top' } },
+      onClick(evt, elements) {
+        if (!elements.length) return;
+        location.href = '/reports?org=' + encodeURIComponent(orgLabels[elements[0].index]);
+      },
+      onHover(evt, elements) { evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; }
     }
   });
 }

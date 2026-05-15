@@ -87,3 +87,16 @@ First versioned release. Covers all work since the initial commit.
 ## [Unreleased]
 
 _Changes on `master` not yet tagged._
+
+---
+
+## [1.1.0] - 2026-05-15
+
+### Added
+- Clickable dashboard — stat cards (Reports, Passed, Failed) and all chart elements navigate to the Reports page pre-filtered by the clicked value (status, date, domain, source IP, or reporting organisation)
+- Active filter chips on the Reports page — each active filter (status, date, IP, org, domain) shows a dismissible badge; clicking × removes only that filter
+- Result count shown alongside active filter chips
+- Pagination links on the Reports page now preserve all active filters across pages
+
+### Fixed
+- SSO enabled toggle on the tenant form never saved as enabled — caused by a hidden input with the same name creating an array that broke the server-side equality check

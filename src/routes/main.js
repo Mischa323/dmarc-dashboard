@@ -10,23 +10,43 @@ router.get('/', (req, res) => {
 });
 
 router.get('/reports', (req, res) => {
-  const db = getDb();
-  const page = Math.max(1, parseInt(req.query.page || '1', 10));
-  const domain = req.query.domain || '';
+  const db     = getDb();
+  const page   = Math.max(1, parseInt(req.query.page || '1', 10));
   const perPage = 25;
-  const offset = (page - 1) * perPage;
+  const offset  = (page - 1) * perPage;
 
-  let where = '';
-  const params = [];
-  if (domain) { where = 'WHERE domain LIKE ?'; params.push(`%${domain}%`); }
+  // Active filters
+  const domain = req.query.domain || '';
+  const status = req.query.status || '';   // 'pass' | 'fail'
+  const date   = req.query.date   || '';   // 'YYYY-MM-DD'
+  const ip     = req.query.ip     || '';   // source IP
+  const org    = req.query.org    || '';   // org_name
 
-  const total = db.prepare(`SELECT COUNT(*) as cnt FROM reports ${where}`).get(...params).cnt;
+  const conditions = [];
+  const params     = [];
+
+  if (domain) { conditions.push('domain LIKE ?');         params.push(`%${domain}%`); }
+  if (org)    { conditions.push('org_name = ?');           params.push(org); }
+  if (date)   { conditions.push("DATE(end_date) = ?");     params.push(date); }
+  if (ip)     { conditions.push('id IN (SELECT DISTINCT report_id FROM records WHERE source_ip = ?)'); params.push(ip); }
+  if (status === 'pass') {
+    conditions.push('id IN (SELECT DISTINCT report_id FROM records WHERE dkim_aligned = ? OR spf_aligned = ?)');
+    params.push('pass', 'pass');
+  }
+  if (status === 'fail') {
+    conditions.push('id IN (SELECT DISTINCT report_id FROM records WHERE dkim_aligned != ? AND spf_aligned != ?)');
+    params.push('pass', 'pass');
+  }
+
+  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+
+  const total   = db.prepare(`SELECT COUNT(*) as cnt FROM reports ${where}`).get(...params).cnt;
   const reports = db.prepare(`SELECT * FROM reports ${where} ORDER BY end_date DESC LIMIT ? OFFSET ?`).all(...params, perPage, offset);
   const domains = db.prepare('SELECT DISTINCT domain FROM reports ORDER BY domain').all().map(r => r.domain);
 
   let enriched = [];
   if (reports.length > 0) {
-    const ph = reports.map(() => '?').join(',');
+    const ph    = reports.map(() => '?').join(',');
     const stats = db.prepare(`
       SELECT report_id,
         SUM(count) as total,
@@ -36,45 +56,62 @@ router.get('/reports', (req, res) => {
     const sm = {};
     for (const s of stats) sm[s.report_id] = s;
     enriched = reports.map(r => {
-      const s = sm[r.id] || { total: 0, passed: 0 };
+      const s   = sm[r.id] || { total: 0, passed: 0 };
       const tot = s.total || 0, pass = s.passed || 0;
-      return { ...r, total_messages: tot, passed_messages: pass, failed_messages: tot - pass, pass_rate: tot > 0 ? Math.round((pass / tot) * 1000) / 10 : 0 };
+      return { ...r, total_messages: tot, passed_messages: pass, failed_messages: tot - pass,
+               pass_rate: tot > 0 ? Math.round((pass / tot) * 1000) / 10 : 0 };
     });
   }
 
-  // Build domain → color map from tenant colours
+  // Build domain colour map
   const DOMAIN_PALETTE = ['#0a84ff','#30d158','#bf5af2','#ff9f0a','#64d2ff','#ff6961','#5ac8fa','#ffd60a'];
   const tenantRows = db.prepare(`
-    SELECT td.domain, COALESCE(t.color, ?) AS color, t.id
-    FROM tenant_domains td
-    JOIN sso_tenants t ON td.tenant_id = t.id
-  `).all(null);
+    SELECT td.domain, COALESCE(t.color, NULL) AS color, t.id
+    FROM tenant_domains td JOIN sso_tenants t ON td.tenant_id = t.id
+  `).all();
   const domainColors = {};
   let pi = 0;
   for (const row of tenantRows) {
     domainColors[row.domain] = row.color || DOMAIN_PALETTE[pi++ % DOMAIN_PALETTE.length];
   }
 
-  res.render('reports', { title: 'Reports — DMARC', path: '/reports', reports: enriched, domains, domainColors, selectedDomain: domain, page, totalPages: Math.ceil(total / perPage), total });
+  // Query string for pagination (preserves all active filters)
+  const filterParams = new URLSearchParams();
+  if (domain) filterParams.set('domain', domain);
+  if (status) filterParams.set('status', status);
+  if (date)   filterParams.set('date', date);
+  if (ip)     filterParams.set('ip', ip);
+  if (org)    filterParams.set('org', org);
+  const filterQuery = filterParams.toString();
+
+  const activeFilters = { domain, status, date, ip, org };
+
+  res.render('reports', {
+    title: 'Reports — DMARC', path: '/reports',
+    reports: enriched, domains, domainColors,
+    selectedDomain: domain, activeFilters, filterQuery,
+    page, totalPages: Math.ceil(total / perPage), total,
+  });
 });
 
 router.get('/reports/:id', (req, res) => {
-  const db = getDb();
+  const db     = getDb();
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
   if (!report) return res.status(404).render('error', { layout: 'layout', title: 'Not Found', message: 'Report not found.' });
 
   const records = db.prepare('SELECT * FROM records WHERE report_id = ? ORDER BY count DESC').all(report.id);
   const enrichedRecords = records.map(rec => ({
     ...rec,
-    dmarc_pass: rec.dkim_aligned === 'pass' || rec.spf_aligned === 'pass',
+    dmarc_pass:     rec.dkim_aligned === 'pass' || rec.spf_aligned === 'pass',
     failure_reason: _failureReason(rec),
   }));
-  const total = records.reduce((s, r) => s + r.count, 0);
+  const total  = records.reduce((s, r) => s + r.count, 0);
   const passed = records.filter(r => r.dkim_aligned === 'pass' || r.spf_aligned === 'pass').reduce((s, r) => s + r.count, 0);
 
   res.render('report_detail', {
     title: `${report.domain} — DMARC Report`, path: '/reports',
-    report: { ...report, records: enrichedRecords, total_messages: total, passed_messages: passed, failed_messages: total - passed, pass_rate: total > 0 ? Math.round((passed / total) * 1000) / 10 : 0 },
+    report: { ...report, records: enrichedRecords, total_messages: total, passed_messages: passed,
+              failed_messages: total - passed, pass_rate: total > 0 ? Math.round((passed / total) * 1000) / 10 : 0 },
   });
 });
 
@@ -82,19 +119,16 @@ router.post('/fetch', async (req, res) => {
   try {
     const db = getDb();
     let stored = 0;
-
     if (req.session.userType === 'sso') {
       const tenant = db.prepare('SELECT * FROM sso_tenants WHERE id = ? AND enabled = 1').get(req.session.tenantDbId);
       if (!tenant) return res.status(400).json({ error: 'Your tenant is not configured or disabled.' });
       const accessToken = await getUserAccessToken(tenant, req.session);
       stored = await fetchAndStore(tenant, accessToken);
     } else {
-      // Local admin: fetch all enabled tenants via client credentials
       const tenants = db.prepare('SELECT * FROM sso_tenants WHERE enabled = 1').all();
       if (tenants.length === 0) return res.status(400).json({ error: 'No SSO tenants configured yet. Add one in Admin → Tenants.' });
       for (const tenant of tenants) stored += await fetchAndStore(tenant, null);
     }
-
     res.json({ stored });
   } catch (err) {
     if (err.code === 'interaction_required' || err.name === 'InteractionRequiredAuthError') {
