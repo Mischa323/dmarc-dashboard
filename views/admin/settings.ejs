@@ -107,7 +107,7 @@
   </div>
 
   <!-- Single save row -->
-  <div class="d-flex gap-2 mt-3 mb-5">
+  <div class="d-flex gap-2 mt-3">
     <button type="submit" class="btn btn-success px-4">
       <i class="bi bi-check-lg me-1"></i>Save settings
     </button>
@@ -116,128 +116,6 @@
     </button>
   </div>
 </form>
-
-<!-- Email Reports (outside the settings form) -->
-<div style="max-width:760px;">
-  <div class="d-flex align-items-center mb-3 gap-3">
-    <h5 class="mb-0 fw-bold">Email Reports</h5>
-    <a href="/admin/email-reports/new" class="btn btn-sm btn-success ms-auto">
-      <i class="bi bi-plus-lg me-1"></i>Add group
-    </a>
-  </div>
-
-  <% if (emailGroups.length === 0) { %>
-  <div class="card p-4 text-center text-secondary mb-4">
-    <i class="bi bi-envelope-paper mb-2" style="font-size:1.6rem;"></i>
-    <p class="mb-2 small">No email report groups configured yet.</p>
-    <a href="/admin/email-reports/new" class="btn btn-sm btn-success">Create first group</a>
-  </div>
-  <% } else { %>
-  <div class="card mb-4">
-    <div class="table-responsive">
-      <table class="table table-hover mb-0 align-middle">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Schedule</th>
-            <th>Transport</th>
-            <th>Recipients</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% for (const g of emailGroups) { %>
-          <tr id="er-row-<%= g.id %>">
-            <td class="fw-semibold small"><%= g.name %></td>
-            <td class="small">
-              <% if (g.schedule === 'daily') { %>
-              <span class="badge" style="background:rgba(10,132,255,.12);color:#0a84ff;border:1px solid rgba(10,132,255,.22);">Daily</span>
-              <% } else if (g.schedule === 'weekly') { %>
-              <span class="badge" style="background:rgba(48,209,88,.12);color:#30d158;border:1px solid rgba(48,209,88,.22);">Weekly</span>
-              <% } else { %>
-              <span class="badge" style="background:rgba(191,90,242,.12);color:#bf5af2;border:1px solid rgba(191,90,242,.22);">Daily+Weekly</span>
-              <% } %>
-              <span class="text-secondary ms-1" style="font-size:.75rem;"><%= g.send_time || '08:00' %> UTC</span>
-            </td>
-            <td class="small">
-              <% if (g.transport === 'graph') { %>
-              <span class="badge" style="background:rgba(10,132,255,.12);color:#0a84ff;border:1px solid rgba(10,132,255,.22);"><i class="bi bi-microsoft me-1"></i>Graph</span>
-              <% } else { %>
-              <span class="badge" style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.12);">SMTP</span>
-              <% } %>
-            </td>
-            <td class="small text-secondary"><%= g.recipient_count %></td>
-            <td>
-              <% if (g.enabled) { %>
-              <span class="badge badge-pass px-2 py-1">Active</span>
-              <% } else { %>
-              <span class="badge bg-secondary bg-opacity-25 text-secondary px-2 py-1">Disabled</span>
-              <% } %>
-            </td>
-            <td class="text-end" style="min-width:240px;">
-              <div class="d-flex gap-1 justify-content-end flex-wrap">
-                <button class="btn btn-sm btn-outline-secondary" onclick="erSendNow(<%= g.id %>, 'daily')">
-                  <i class="bi bi-send me-1"></i>Daily
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="erSendNow(<%= g.id %>, 'weekly')">
-                  <i class="bi bi-send me-1"></i>Weekly
-                </button>
-                <a href="/admin/email-reports/<%= g.id %>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
-                <form method="post" action="/admin/email-reports/<%= g.id %>/toggle" class="d-inline">
-                  <button class="btn btn-sm btn-outline-secondary"><%= g.enabled ? 'Disable' : 'Enable' %></button>
-                </form>
-                <form method="post" action="/admin/email-reports/<%= g.id %>/delete" class="d-inline"
-                      onsubmit="return confirm('Delete \'<%= g.name %>\'?')">
-                  <button class="btn btn-sm btn-outline-danger">Delete</button>
-                </form>
-              </div>
-            </td>
-          </tr>
-          <tr id="er-result-row-<%= g.id %>" style="display:none;">
-            <td colspan="6" class="pt-0 pb-2 px-3">
-              <div id="er-result-<%= g.id %>" class="rounded p-2 small"></div>
-            </td>
-          </tr>
-          <% } %>
-        </tbody>
-      </table>
-    </div>
-  </div>
-  <% } %>
-</div>
-
-<script>
-  async function erSendNow(id, period) {
-    const row    = document.getElementById('er-result-row-' + id);
-    const result = document.getElementById('er-result-' + id);
-    result.style.cssText = 'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;';
-    result.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending…';
-    row.style.display = '';
-    try {
-      const r = await fetch('/admin/email-reports/' + id + '/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'period=' + period,
-      });
-      const data = await r.json();
-      if (data.error) {
-        result.style.cssText = 'background:rgba(255,69,58,.07);border:1px solid rgba(255,69,58,.2);border-radius:10px;';
-        result.innerHTML = '<i class="bi bi-x-circle-fill me-2" style="color:#ff453a;"></i><span style="color:#ff453a;">' + escHtml(data.error) + '</span>';
-      } else if (data.skipped) {
-        result.style.cssText = 'background:rgba(255,159,10,.07);border:1px solid rgba(255,159,10,.2);border-radius:10px;';
-        result.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2" style="color:#ff9f0a;"></i><span style="color:#ff9f0a;">Skipped — ' + escHtml(data.reason) + '</span>';
-      } else {
-        result.style.cssText = 'background:rgba(48,209,88,.07);border:1px solid rgba(48,209,88,.2);border-radius:10px;';
-        result.innerHTML = '<i class="bi bi-check-circle-fill me-2" style="color:#30d158;"></i><span style="color:#30d158;">' + period + ' report sent to ' + data.recipients + ' recipient(s).</span>';
-      }
-    } catch (e) {
-      result.style.cssText = 'background:rgba(255,69,58,.07);border:1px solid rgba(255,69,58,.2);border-radius:10px;';
-      result.innerHTML = '<i class="bi bi-x-circle-fill me-2" style="color:#ff453a;"></i><span style="color:#ff453a;">' + escHtml(e.message) + '</span>';
-    }
-  }
-  function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-</script>
 
 <style>
   .settings-swatch {

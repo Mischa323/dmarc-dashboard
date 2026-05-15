@@ -205,9 +205,13 @@ router.get('/users', (req, res) => {
     ORDER BY u.created_at DESC
   `).all();
   const localUsers = db.prepare('SELECT id, username, role, totp_enabled, created_at FROM local_users ORDER BY id').all();
+  const emailGroups = db.prepare('SELECT * FROM email_report_groups ORDER BY name').all();
+  for (const g of emailGroups) {
+    g.recipient_count = db.prepare('SELECT COUNT(*) as n FROM email_report_recipients WHERE group_id = ?').get(g.id).n;
+  }
   const flash = req.session.flash || null;
   delete req.session.flash;
-  res.render('admin/users', { title: 'Users', path: '/admin', ssoUsers, localUsers, flash });
+  res.render('admin/users', { title: 'Users & Groups', path: '/admin', ssoUsers, localUsers, emailGroups, flash });
 });
 
 // SSO user management
@@ -280,11 +284,7 @@ router.get('/settings', requireLocalAdmin, (req, res) => {
   const globalInterval = parseInt(getSetting(db, 'fetch_interval_minutes', '60')) || 60;
   const flash = req.session.flash || null;
   delete req.session.flash;
-  const emailGroups = db.prepare('SELECT * FROM email_report_groups ORDER BY name').all();
-  for (const g of emailGroups) {
-    g.recipient_count = db.prepare('SELECT COUNT(*) as n FROM email_report_recipients WHERE group_id = ?').get(g.id).n;
-  }
-  res.render('admin/settings', { title: 'Settings', path: '/admin', globalInterval, flash, emailGroups });
+  res.render('admin/settings', { title: 'Settings', path: '/admin', globalInterval, flash });
 });
 
 router.post('/settings', requireLocalAdmin, (req, res) => {
@@ -417,7 +417,7 @@ router.post('/email-reports', async (req, res) => {
 
   saveRecipients(db, r.lastInsertRowid, emails);
   req.session.flash = `Email report group "${name}" created.`;
-  res.redirect('/admin/email-reports');
+  res.redirect('/admin/users');
 });
 
 router.get('/email-reports/:id/edit', (req, res) => {
@@ -469,7 +469,7 @@ router.post('/email-reports/:id', (req, res) => {
 
   saveRecipients(db, req.params.id, emails);
   req.session.flash = `Email report group "${name}" updated.`;
-  res.redirect('/admin/email-reports');
+  res.redirect('/admin/users');
 });
 
 router.post('/email-reports/:id/toggle', (req, res) => {
@@ -477,7 +477,7 @@ router.post('/email-reports/:id/toggle', (req, res) => {
   const group = db.prepare('SELECT enabled FROM email_report_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).send('Not found');
   db.prepare('UPDATE email_report_groups SET enabled = ? WHERE id = ?').run(group.enabled ? 0 : 1, req.params.id);
-  res.redirect('/admin/email-reports');
+  res.redirect('/admin/users');
 });
 
 router.post('/email-reports/:id/delete', (req, res) => {
@@ -485,7 +485,7 @@ router.post('/email-reports/:id/delete', (req, res) => {
   const group = db.prepare('SELECT name FROM email_report_groups WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM email_report_groups WHERE id = ?').run(req.params.id);
   req.session.flash = group ? `Email report group "${group.name}" deleted.` : 'Group deleted.';
-  res.redirect('/admin/email-reports');
+  res.redirect('/admin/users');
 });
 
 router.post('/email-reports/:id/send', async (req, res) => {
