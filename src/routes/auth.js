@@ -147,7 +147,7 @@ router.get('/auth/callback', async (req, res) => {
       `).run(tenant.id, account.username, account.name || account.username, account.homeAccountId);
       ssoUser = db.prepare('SELECT * FROM sso_users WHERE id = ?').get(r.lastInsertRowid);
     } else {
-      db.prepare('UPDATE sso_users SET last_login = datetime("now"), home_account_id = ?, display_name = ? WHERE id = ?')
+      db.prepare("UPDATE sso_users SET last_login = datetime('now'), home_account_id = ?, display_name = ? WHERE id = ?")
         .run(account.homeAccountId, account.name || account.username, ssoUser.id);
     }
 
