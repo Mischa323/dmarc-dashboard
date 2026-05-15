@@ -35,9 +35,16 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label" for="name">Display name <span class="text-danger">*</span></label>
-        <input type="text" class="form-control" id="name" name="name" value="<%= tenant.name %>" placeholder="e.g. Contoso" required />
-        <div class="form-text">A friendly name shown in the dashboard and on the login page.</div>
+        <label class="form-label">Display name <span class="text-danger">*</span></label>
+        <div class="d-flex gap-2 align-items-center">
+          <input type="text" class="form-control" id="name" name="name" value="<%= tenant.name %>" placeholder="e.g. Contoso" required />
+          <div>
+            <input type="color" name="color" value="<%= tenant.color || '#0a84ff' %>"
+                   title="Tenant color — used in charts and report list"
+                   style="width:44px;height:38px;border:1px solid rgba(255,255,255,.15);border-radius:10px;background:none;padding:2px;cursor:pointer;flex-shrink:0;" />
+          </div>
+        </div>
+        <div class="form-text">A friendly name shown in the dashboard and on the login page. The colour identifies this tenant in charts.</div>
       </div>
 
       <div class="mb-3">

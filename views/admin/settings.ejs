@@ -9,14 +9,15 @@
 </div>
 <% } %>
 
-<div class="row g-4" style="max-width:600px;">
-  <div class="col-12">
-    <form method="post" action="/admin/settings">
+<form method="post" action="/admin/settings" onsubmit="saveTheme()" style="max-width:760px;">
+  <div class="row g-4">
+
+    <!-- Fetch schedule -->
+    <div class="col-12">
       <div class="card p-4">
         <h6 class="text-secondary small fw-semibold text-uppercase mb-3" style="letter-spacing:.05em;">
           <i class="bi bi-clock me-2"></i>Fetch schedule
         </h6>
-
         <div class="mb-0">
           <label class="form-label" for="fetch_interval_minutes">Global fetch interval</label>
           <div class="input-group" style="max-width:220px;">
@@ -30,10 +31,132 @@
           </div>
         </div>
       </div>
+    </div>
 
-      <button type="submit" class="btn btn-success mt-3 px-4">
-        <i class="bi bi-check-lg me-1"></i>Save settings
-      </button>
-    </form>
+    <!-- Appearance -->
+    <div class="col-12">
+      <div class="card p-4">
+        <h6 class="text-secondary small fw-semibold text-uppercase mb-3" style="letter-spacing:.05em;">
+          <i class="bi bi-palette me-2"></i>Appearance
+        </h6>
+        <p class="form-text mb-3">
+          Theme preferences are stored in your browser and apply only to you. Changes take effect immediately.
+        </p>
+
+        <label class="form-label mb-2">Preset themes</label>
+        <div class="d-flex flex-wrap gap-3 mb-4">
+          <button type="button" class="settings-swatch" data-theme="cosmic" onclick="applyPreset('cosmic')"
+                  style="background:linear-gradient(135deg,#5e3cff,#0a84ff);">
+            <span>Cosmic</span>
+          </button>
+          <button type="button" class="settings-swatch" data-theme="ocean" onclick="applyPreset('ocean')"
+                  style="background:linear-gradient(135deg,#0096c8,#00ddb4);">
+            <span>Ocean</span>
+          </button>
+          <button type="button" class="settings-swatch" data-theme="midnight" onclick="applyPreset('midnight')"
+                  style="background:linear-gradient(135deg,#3c00c8,#9b5de5);">
+            <span>Midnight</span>
+          </button>
+          <button type="button" class="settings-swatch" data-theme="ember" onclick="applyPreset('ember')"
+                  style="background:linear-gradient(135deg,#ff3c00,#ff8c00);">
+            <span>Ember</span>
+          </button>
+          <button type="button" class="settings-swatch" data-theme="forest" onclick="applyPreset('forest')"
+                  style="background:linear-gradient(135deg,#007830,#0ac864);">
+            <span>Forest</span>
+          </button>
+        </div>
+
+        <label class="form-label mb-2">Custom colors</label>
+        <div class="row g-3 mb-3">
+          <div class="col-6 col-md-3">
+            <div class="color-pick-card">
+              <input type="color" id="pickAccent" oninput="applyCustomColor('accent', this.value)" />
+              <label for="pickAccent">Accent</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="color-pick-card">
+              <input type="color" id="pickPass" oninput="applyCustomColor('pass', this.value)" />
+              <label for="pickPass">Pass</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="color-pick-card">
+              <input type="color" id="pickFail" oninput="applyCustomColor('fail', this.value)" />
+              <label for="pickFail">Fail</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="color-pick-card">
+              <input type="color" id="pickWarn" oninput="applyCustomColor('warn', this.value)" />
+              <label for="pickWarn">Warning</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mb-1">
+          <span class="badge badge-pass px-3 py-2">Pass</span>
+          <span class="badge badge-fail px-3 py-2">Fail</span>
+          <span class="badge px-3 py-2" style="background:rgba(var(--clr-warn-rgb),.14);color:var(--clr-warn);border:1px solid rgba(var(--clr-warn-rgb),.24);">Warning</span>
+          <span class="badge px-3 py-2" style="background:rgba(var(--clr-accent-rgb),.14);color:var(--clr-accent);border:1px solid rgba(var(--clr-accent-rgb),.24);">Accent</span>
+        </div>
+      </div>
+    </div>
+
   </div>
-</div>
+
+  <!-- Single save row -->
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-success px-4">
+      <i class="bi bi-check-lg me-1"></i>Save settings
+    </button>
+    <button type="button" class="btn btn-outline-secondary" onclick="resetTheme()">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>Reset colors
+    </button>
+  </div>
+</form>
+
+<style>
+  .settings-swatch {
+    width: 80px; height: 56px; border-radius: 14px;
+    border: 2px solid transparent; cursor: pointer;
+    transition: transform .15s, border-color .15s, box-shadow .15s;
+    display: flex; align-items: flex-end; padding: 6px 8px;
+  }
+  .settings-swatch span {
+    font-size: .72rem; font-weight: 600;
+    color: rgba(255,255,255,.85); text-shadow: 0 1px 4px rgba(0,0,0,.6);
+  }
+  .settings-swatch:hover { transform: scale(1.06); box-shadow: 0 4px 20px rgba(0,0,0,.5); }
+  .settings-swatch.active { border-color: rgba(255,255,255,.7); box-shadow: 0 0 0 3px rgba(255,255,255,.15); }
+
+  .color-pick-card {
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09);
+    border-radius: 14px; padding: .75rem;
+    display: flex; flex-direction: column; align-items: center; gap: .5rem;
+  }
+  .color-pick-card input[type="color"] {
+    width: 48px; height: 40px; border: 1px solid rgba(255,255,255,.15);
+    border-radius: 10px; background: none; padding: 2px; cursor: pointer;
+  }
+  .color-pick-card label { font-size: .8rem; color: rgba(255,255,255,.55); margin: 0; cursor: pointer; }
+</style>
+
+<script>
+  (function () {
+    const active = localStorage.getItem('dmarc-active-theme');
+    document.querySelectorAll('.settings-swatch').forEach(s =>
+      s.classList.toggle('active', s.dataset.theme === (active || 'cosmic'))
+    );
+    syncPickerValues();
+  })();
+
+  const _origUpdateSwatchActive = updateSwatchActive;
+  function updateSwatchActive(name) {
+    _origUpdateSwatchActive(name);
+    document.querySelectorAll('.settings-swatch').forEach(s =>
+      s.classList.toggle('active', s.dataset.theme === name)
+    );
+  }
+</script>

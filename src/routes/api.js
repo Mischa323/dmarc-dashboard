@@ -3,34 +3,63 @@ const { getDb } = require('../db');
 
 const router = express.Router();
 
+const DOMAIN_PALETTE = ['#0a84ff','#30d158','#bf5af2','#ff9f0a','#64d2ff','#ff6961','#5ac8fa','#ffd60a'];
+
 router.get('/stats', (req, res) => {
   const days = Math.max(1, parseInt(req.query.days || '30', 10));
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const db = getDb();
 
   const records = db.prepare(`
-    SELECT rec.*, rep.end_date, rep.org_name
+    SELECT rec.*, rep.end_date, rep.org_name, rep.domain, t.color AS tenant_color
     FROM records rec
     JOIN reports rep ON rec.report_id = rep.id
+    LEFT JOIN sso_tenants t ON rep.tenant_db_id = t.id
     WHERE rep.end_date >= ?
   `).all(since);
 
   const isPass = r => r.dkim_aligned === 'pass' || r.spf_aligned === 'pass';
 
-  const total = records.reduce((s, r) => s + r.count, 0);
+  const total  = records.reduce((s, r) => s + r.count, 0);
   const passed = records.filter(isPass).reduce((s, r) => s + r.count, 0);
 
-  // Daily trend
-  const daily = {};
+  // Aggregate daily trend + per-domain daily trend
+  const daily       = {};
+  const domainDaily = {};
+  const domainColorSeen = {};
+
   for (const rec of records) {
-    const date = (rec.end_date || '').slice(0, 10);
+    const date   = (rec.end_date || '').slice(0, 10);
+    const domain = rec.domain || 'unknown';
     if (!daily[date]) daily[date] = { pass: 0, fail: 0 };
-    if (isPass(rec)) daily[date].pass += rec.count;
-    else daily[date].fail += rec.count;
+    if (!domainDaily[domain]) domainDaily[domain] = {};
+    if (!domainDaily[domain][date]) domainDaily[domain][date] = { pass: 0, fail: 0 };
+
+    if (isPass(rec)) { daily[date].pass += rec.count; domainDaily[domain][date].pass += rec.count; }
+    else             { daily[date].fail += rec.count; domainDaily[domain][date].fail += rec.count; }
+
+    if (!domainColorSeen[domain]) domainColorSeen[domain] = rec.tenant_color || null;
   }
-  const dailyTrend = Object.entries(daily)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, v]) => ({ date, ...v }));
+
+  const allDates = Object.keys(daily).sort();
+
+  const dailyTrend = allDates.map(date => ({ date, ...daily[date] }));
+
+  // Assign palette colors to any domain without a tenant color
+  const domainColors = {};
+  let paletteIdx = 0;
+  for (const domain of Object.keys(domainColorSeen)) {
+    domainColors[domain] = domainColorSeen[domain] || DOMAIN_PALETTE[paletteIdx++ % DOMAIN_PALETTE.length];
+  }
+
+  const domainTrends = {};
+  for (const [domain, dateMap] of Object.entries(domainDaily)) {
+    domainTrends[domain] = allDates.map(date => ({
+      date,
+      pass: dateMap[date]?.pass || 0,
+      fail: dateMap[date]?.fail || 0,
+    }));
+  }
 
   // Failure reasons
   const failureReasons = { dkim_and_spf: 0, dkim_only: 0, spf_only: 0 };
@@ -78,10 +107,12 @@ router.get('/stats', (req, res) => {
       pass_rate: total > 0 ? Math.round((passed / total) * 1000) / 10 : 0,
       unique_ips: Object.keys(ipMap).length,
     },
-    daily_trend: dailyTrend,
+    daily_trend:     dailyTrend,
+    domain_trends:   domainTrends,
+    domain_colors:   domainColors,
     failure_reasons: failureReasons,
-    top_sources: topSources,
-    top_orgs: topOrgs,
+    top_sources:     topSources,
+    top_orgs:        topOrgs,
   });
 });
 

@@ -33,7 +33,10 @@
         <% } %>
         <% for (const report of reports) { %>
         <tr onclick="window.location='/reports/<%= report.id %>'" style="cursor:pointer">
-          <td><a href="/reports/<%= report.id %>" class="fw-semibold text-decoration-none"><%= report.domain %></a></td>
+          <td>
+            <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:<%= domainColors[report.domain] || 'rgba(255,255,255,.25)' %>;margin-right:7px;vertical-align:middle;flex-shrink:0;"></span>
+            <a href="/reports/<%= report.id %>" class="fw-semibold text-decoration-none"><%= report.domain %></a>
+          </td>
           <td class="text-secondary small"><%= report.org_name || '—' %></td>
           <td class="text-secondary small"><%= report.end_date ? report.end_date.slice(0, 10) : '—' %></td>
           <td class="text-end"><%= report.total_messages %></td>

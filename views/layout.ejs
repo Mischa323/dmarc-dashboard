@@ -160,27 +160,7 @@
     .modal-header { border-color: rgba(255,255,255,.07) !important; }
     .modal-backdrop.show { opacity: .55; }
 
-    /* ── Theme panel ──────────────────────────────────────────────────────── */
-    .theme-panel { min-width: 272px !important; padding: 1rem !important; }
-    .theme-panel h6 { font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: rgba(255,255,255,.38); margin-bottom: .65rem; }
-    .theme-swatches { display: flex; gap: .5rem; margin-bottom: 1rem; }
-    .theme-swatch {
-      width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent;
-      cursor: pointer; transition: transform .15s, border-color .15s;
-      flex-shrink: 0;
-    }
-    .theme-swatch:hover { transform: scale(1.12); }
-    .theme-swatch.active { border-color: rgba(255,255,255,.6); transform: scale(1.08); }
-    .color-row { display: flex; align-items: center; justify-content: space-between; padding: .35rem 0; border-bottom: 1px solid rgba(255,255,255,.06); }
-    .color-row:last-child { border-bottom: none; }
-    .color-row label { font-size: .84rem; color: rgba(255,255,255,.72); margin: 0; }
-    .color-row input[type="color"] {
-      width: 36px; height: 28px; border: 1px solid rgba(255,255,255,.15);
-      border-radius: 7px; background: none; padding: 2px;
-      cursor: pointer;
-    }
-
-    /* ── Misc ─────────────────────────────────────────────────────────────── */
+/* ── Misc ─────────────────────────────────────────────────────────────── */
     a { color: var(--clr-accent); }
     a:hover { color: color-mix(in srgb, var(--clr-accent) 70%, #fff 30%); }
     .pass-color { color: var(--clr-pass); }
@@ -240,44 +220,7 @@
             <i class="bi bi-arrow-clockwise me-1"></i>Fetch now
           </button>
 
-          <!-- Theme picker -->
-          <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Appearance">
-              <i class="bi bi-palette"></i>
-            </button>
-            <div class="dropdown-menu dropdown-menu-end theme-panel">
-              <h6>Preset themes</h6>
-              <div class="theme-swatches">
-                <button class="theme-swatch" data-theme="cosmic"   style="background:linear-gradient(135deg,#5e3cff,#0a84ff);" title="Cosmic"></button>
-                <button class="theme-swatch" data-theme="ocean"    style="background:linear-gradient(135deg,#0096c8,#00ddb4);" title="Ocean"></button>
-                <button class="theme-swatch" data-theme="midnight" style="background:linear-gradient(135deg,#3c00c8,#9b5de5);" title="Midnight"></button>
-                <button class="theme-swatch" data-theme="ember"    style="background:linear-gradient(135deg,#ff3c00,#ff8c00);" title="Ember"></button>
-                <button class="theme-swatch" data-theme="forest"   style="background:linear-gradient(135deg,#007830,#0ac864);" title="Forest"></button>
-              </div>
-              <h6>Custom colors</h6>
-              <div class="color-row">
-                <label>Accent</label>
-                <input type="color" id="pickAccent" value="#0a84ff" oninput="applyCustomColor('accent', this.value)" />
-              </div>
-              <div class="color-row">
-                <label>Pass</label>
-                <input type="color" id="pickPass" value="#30d158" oninput="applyCustomColor('pass', this.value)" />
-              </div>
-              <div class="color-row">
-                <label>Fail</label>
-                <input type="color" id="pickFail" value="#ff453a" oninput="applyCustomColor('fail', this.value)" />
-              </div>
-              <div class="color-row">
-                <label>Warning</label>
-                <input type="color" id="pickWarn" value="#ff9f0a" oninput="applyCustomColor('warn', this.value)" />
-              </div>
-              <button class="btn btn-sm btn-outline-secondary w-100 mt-2" onclick="resetTheme()">
-                <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to defaults
-              </button>
-            </div>
-          </div>
-
-          <% if (locals.user) { %>
+<% if (locals.user) { %>
           <span class="text-secondary small d-none d-lg-inline" style="font-size:.82rem;">
             <i class="bi bi-person-circle me-1"></i><%= user.name %>
             <% if (user.role === 'local_admin') { %>
@@ -383,9 +326,6 @@
     function updateSwatchActive(name) {
       document.querySelectorAll('.theme-swatch').forEach(s => s.classList.toggle('active', s.dataset.theme === name));
     }
-
-    // Wire swatch clicks
-    document.querySelectorAll('.theme-swatch').forEach(s => s.addEventListener('click', () => applyPreset(s.dataset.theme)));
 
     // Init on load
     (function () {

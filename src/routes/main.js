@@ -42,7 +42,20 @@ router.get('/reports', (req, res) => {
     });
   }
 
-  res.render('reports', { title: 'Reports — DMARC', path: '/reports', reports: enriched, domains, selectedDomain: domain, page, totalPages: Math.ceil(total / perPage), total });
+  // Build domain → color map from tenant colours
+  const DOMAIN_PALETTE = ['#0a84ff','#30d158','#bf5af2','#ff9f0a','#64d2ff','#ff6961','#5ac8fa','#ffd60a'];
+  const tenantRows = db.prepare(`
+    SELECT td.domain, COALESCE(t.color, ?) AS color, t.id
+    FROM tenant_domains td
+    JOIN sso_tenants t ON td.tenant_id = t.id
+  `).all(null);
+  const domainColors = {};
+  let pi = 0;
+  for (const row of tenantRows) {
+    domainColors[row.domain] = row.color || DOMAIN_PALETTE[pi++ % DOMAIN_PALETTE.length];
+  }
+
+  res.render('reports', { title: 'Reports — DMARC', path: '/reports', reports: enriched, domains, domainColors, selectedDomain: domain, page, totalPages: Math.ceil(total / perPage), total });
 });
 
 router.get('/reports/:id', (req, res) => {

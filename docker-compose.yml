@@ -1,19 +1,41 @@
 services:
   dmarc-dashboard:
-    build: .
+    image: ghcr.io/mischa323/dmarc-dashboard:latest
+    # To build locally from source instead (e.g. for development):
+    #   comment out the image line above and uncomment the line below.
+    # build: .
     restart: unless-stopped
     ports:
-      - "3443:3443"
+      - "${PORT:-3443}:${PORT:-3443}"
     volumes:
       - dmarc_data:/data
     environment:
-      # Generate a strong random value and set it here — never leave it empty in production.
-      SECRET: "change-me-to-a-random-64-char-string"
-      PORT: "3443"
+      # Generate a strong random value — never leave the default in production.
+      SECRET: "${SECRET:-change-me-to-a-random-64-char-string}"
+      PORT: "${PORT:-3443}"
       DATABASE_URL: "/data/dmarc.db"
       CERTS_DIR: "/data/certs"
-      # Uncomment the line below when running behind a reverse proxy that terminates TLS.
+      # Uncomment when running behind a reverse proxy that terminates TLS.
       # HTTP_MODE: "1"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ── Watchtower (optional — automatic image updates) ────────────────────────
+  # Uncomment the block below to enable Watchtower.
+  # Watchtower will automatically pull new images and restart the container
+  # whenever a new version is published to GHCR.
+  #
+  # watchtower:
+  #   image: containrrr/watchtower
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   environment:
+  #     WATCHTOWER_LABEL_ENABLE: "true"      # only watch containers with the enable label
+  #     WATCHTOWER_CLEANUP: "true"           # remove old images after update
+  #     WATCHTOWER_POLL_INTERVAL: "86400"    # check every 24 hours (in seconds)
+  #     WATCHTOWER_INCLUDE_RESTARTING: "true"
+  #   command: --label-enable
 
 volumes:
   dmarc_data:

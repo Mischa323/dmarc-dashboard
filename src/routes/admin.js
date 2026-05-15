@@ -7,6 +7,13 @@ const { getDb, getSetting, setSetting } = require('../db');
 const { startScheduler } = require('../scheduler');
 const { testTenantConnection } = require('../tenantTest');
 
+const DOMAIN_PALETTE = ['#0a84ff','#30d158','#bf5af2','#ff9f0a','#64d2ff','#ff6961','#5ac8fa','#ffd60a'];
+
+function autoColor(db) {
+  const n = db.prepare('SELECT COUNT(*) as n FROM sso_tenants').get().n;
+  return DOMAIN_PALETTE[n % DOMAIN_PALETTE.length];
+}
+
 const router = express.Router();
 
 // ── Guards ─────────────────────────────────────────────────────────────────
@@ -92,10 +99,11 @@ router.post('/tenants', (req, res) => {
 
   const db = getDb();
   const globalInterval = parseInt(getSetting(db, 'fetch_interval_minutes', '60')) || 60;
+  const color = (req.body.color || '').trim() || autoColor(db);
 
   const fail = (msg) => res.render('admin/tenant_form', {
     title: 'Add Tenant', path: '/admin', globalInterval,
-    tenant: { ...req.body, sso_enabled, domains: rawDomains, fetch_interval_override },
+    tenant: { ...req.body, sso_enabled, domains: rawDomains, fetch_interval_override, color },
     error: msg,
   });
 
@@ -108,10 +116,10 @@ router.post('/tenants', (req, res) => {
     const r = db.prepare(`
       INSERT INTO sso_tenants
         (name, tenant_id, client_id, client_secret, redirect_uri, mailbox,
-         mail_folder, fetch_interval_override, sso_enabled)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         mail_folder, fetch_interval_override, sso_enabled, color)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(name, tenant_id, client_id, client_secret, redirect_uri || '', mailbox,
-           mail_folder || 'Inbox', fetch_interval_override, sso_enabled);
+           mail_folder || 'Inbox', fetch_interval_override, sso_enabled, color);
     saveDomains(db, r.lastInsertRowid, rawDomains);
     startScheduler();
     req.session.flash = `Tenant "${name}" added.`;
@@ -142,12 +150,13 @@ router.post('/tenants/:id', (req, res) => {
   if (!existing) return res.status(404).send('Not found');
 
   const secret = (client_secret && client_secret.trim()) ? client_secret.trim() : existing.client_secret;
+  const color  = (req.body.color || '').trim() || existing.color || autoColor(db);
   db.prepare(`
     UPDATE sso_tenants SET name=?, tenant_id=?, client_id=?, client_secret=?,
-      redirect_uri=?, mailbox=?, mail_folder=?, fetch_interval_override=?, sso_enabled=?
+      redirect_uri=?, mailbox=?, mail_folder=?, fetch_interval_override=?, sso_enabled=?, color=?
     WHERE id=?
   `).run(name, tenant_id, client_id, secret, redirect_uri || '', mailbox,
-         mail_folder || 'Inbox', fetch_interval_override, sso_enabled, req.params.id);
+         mail_folder || 'Inbox', fetch_interval_override, sso_enabled, color, req.params.id);
   saveDomains(db, req.params.id, rawDomains);
   startScheduler();
   req.session.flash = `Tenant "${name}" updated.`;
