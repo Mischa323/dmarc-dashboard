@@ -75,10 +75,10 @@ function loadTenantsWithDomains(db) {
 
 function saveDomains(db, tenantId, rawDomains) {
   db.prepare('DELETE FROM tenant_domains WHERE tenant_id = ?').run(tenantId);
-  const ins = db.prepare('INSERT OR IGNORE INTO tenant_domains (tenant_id, domain, dmarc_policy) VALUES (?, ?, ?)');
+  const ins = db.prepare('INSERT OR IGNORE INTO tenant_domains (tenant_id, domain, dmarc_policy, color) VALUES (?, ?, ?, ?)');
   for (const d of (rawDomains || [])) {
     const dom = (d.domain || '').trim();
-    if (dom) ins.run(tenantId, dom, ['none', 'quarantine', 'reject'].includes(d.policy) ? d.policy : 'none');
+    if (dom) ins.run(tenantId, dom, ['none', 'quarantine', 'reject'].includes(d.policy) ? d.policy : 'none', d.color || null);
   }
 }
 

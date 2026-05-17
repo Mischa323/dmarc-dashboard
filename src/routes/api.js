@@ -13,17 +13,21 @@ router.get('/stats', (req, res) => {
   const isSso = req.session.userType === 'sso';
   const records = isSso
     ? db.prepare(`
-        SELECT rec.*, rep.end_date, rep.org_name, rep.domain, t.color AS tenant_color
+        SELECT rec.*, rep.end_date, rep.org_name, rep.domain,
+               t.color AS tenant_color, td.color AS domain_color
         FROM records rec
         JOIN reports rep ON rec.report_id = rep.id
         LEFT JOIN sso_tenants t ON rep.tenant_db_id = t.id
+        LEFT JOIN tenant_domains td ON td.tenant_id = rep.tenant_db_id AND td.domain = rep.domain
         WHERE rep.end_date >= ? AND rep.tenant_db_id = ?
       `).all(since, req.session.tenantDbId)
     : db.prepare(`
-        SELECT rec.*, rep.end_date, rep.org_name, rep.domain, t.color AS tenant_color
+        SELECT rec.*, rep.end_date, rep.org_name, rep.domain,
+               t.color AS tenant_color, td.color AS domain_color
         FROM records rec
         JOIN reports rep ON rec.report_id = rep.id
         LEFT JOIN sso_tenants t ON rep.tenant_db_id = t.id
+        LEFT JOIN tenant_domains td ON td.tenant_id = rep.tenant_db_id AND td.domain = rep.domain
         WHERE rep.end_date >= ?
       `).all(since);
 
@@ -48,7 +52,7 @@ router.get('/stats', (req, res) => {
     if (isPass(rec)) { daily[date].pass += rec.count; domainDaily[domain][date].pass += rec.count; }
     else             { daily[date].fail += rec.count; domainDaily[domain][date].fail += rec.count; }
 
-    if (!domainColorSeen[domain]) domainColorSeen[domain] = rec.tenant_color || null;
+    if (!domainColorSeen[domain]) domainColorSeen[domain] = { tenant: rec.tenant_color || null, domain: rec.domain_color || null };
   }
 
   const allDates = Object.keys(daily).sort();
@@ -59,7 +63,9 @@ router.get('/stats', (req, res) => {
   const domainColors = {};
   let paletteIdx = 0;
   for (const domain of Object.keys(domainColorSeen)) {
-    domainColors[domain] = domainColorSeen[domain] || DOMAIN_PALETTE[paletteIdx++ % DOMAIN_PALETTE.length];
+    const tenantClr = domainColorSeen[domain].tenant || DOMAIN_PALETTE[paletteIdx++ % DOMAIN_PALETTE.length];
+    const domainClr = domainColorSeen[domain].domain || tenantClr;
+    domainColors[domain] = { tenant: tenantClr, domain: domainClr };
   }
 
   const domainTrends = {};

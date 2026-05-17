@@ -180,12 +180,16 @@ function buildTrendLine(trend, domainTrends, domainColors) {
   const multiDomain = domains.length > 1;
   if (multiDomain) {
     datasets = domains.map(domain => {
-      const color = (domainColors || {})[domain] || '#0a84ff';
+      const colorInfo = (domainColors || {})[domain] || {};
+      const tenantClr = colorInfo.tenant || '#0a84ff';
+      const domainClr = colorInfo.domain || tenantClr;
       return {
         label: domain,
         data: (domainTrends[domain] || []).map(d => d.pass + d.fail),
-        ...glassBar(color),
+        ...glassBar(domainClr),
         stack: 'a',
+        _tenantClr: tenantClr !== domainClr ? tenantClr : null,
+        _domainClr: tenantClr !== domainClr ? domainClr : null,
       };
     });
   } else {
@@ -195,11 +199,37 @@ function buildTrendLine(trend, domainTrends, domainColors) {
     ];
   }
 
+  const gradientPlugin = {
+    id: 'domainGradient',
+    beforeDatasetsDraw(chart) {
+      const { ctx } = chart;
+      chart.data.datasets.forEach((dataset, dsIdx) => {
+        if (!dataset._tenantClr || !dataset._domainClr) return;
+        const meta = chart.getDatasetMeta(dsIdx);
+        if (!meta.visible) return;
+        meta.data.forEach(bar => {
+          const top    = Math.min(bar.y, bar.base);
+          const bottom = Math.max(bar.y, bar.base);
+          if (bottom - top < 1) return;
+          const grad = ctx.createLinearGradient(0, top, 0, bottom);
+          grad.addColorStop(0, hexToRgba(dataset._domainClr, 0.78));
+          grad.addColorStop(1, hexToRgba(dataset._tenantClr, 0.35));
+          bar.options.backgroundColor = grad;
+          const hgrad = ctx.createLinearGradient(0, top, 0, bottom);
+          hgrad.addColorStop(0, hexToRgba(dataset._domainClr, 0.92));
+          hgrad.addColorStop(1, hexToRgba(dataset._tenantClr, 0.52));
+          bar.options.hoverBackgroundColor = hgrad;
+        });
+      });
+    }
+  };
+
   const trendLabels = trend.map(d => d.date);
 
   charts['trendLine'] = new Chart(document.getElementById('trendLine'), {
     type: 'bar',
     data: { labels: trendLabels, datasets },
+    plugins: [gradientPlugin],
     options: {
       responsive: true, maintainAspectRatio: false,
       scales: glassScales(true, false),

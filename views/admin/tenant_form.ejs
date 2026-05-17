@@ -135,7 +135,7 @@
         <% for (let i = 0; i < (tenant.domains || []).length; i++) { %>
         <div class="domain-row mb-2 p-3 rounded" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);">
           <div class="row g-2 align-items-end mb-2">
-            <div class="col-md-6">
+            <div class="col-md-5">
               <label class="form-label small mb-1">Domain</label>
               <input type="text" class="form-control form-control-sm domain-input"
                      name="domains[<%= i %>][domain]"
@@ -143,7 +143,7 @@
                      placeholder="yourdomain.com"
                      oninput="updateRowPreview(this.closest('.domain-row'))" />
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label small mb-1">Policy <span class="text-secondary fw-normal">(p=)</span></label>
               <select class="form-select form-select-sm policy-select"
                       name="domains[<%= i %>][policy]"
@@ -152,6 +152,12 @@
                 <option value="quarantine" <%= tenant.domains[i].dmarc_policy === 'quarantine' ? 'selected' : '' %>>quarantine</option>
                 <option value="reject"     <%= tenant.domains[i].dmarc_policy === 'reject'     ? 'selected' : '' %>>reject</option>
               </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small mb-1">Color</label>
+              <input type="color" class="form-control form-control-sm form-control-color w-100 color-input"
+                     name="domains[<%= i %>][color]"
+                     value="<%= tenant.domains[i].color || tenant.color || '#0a84ff' %>" />
             </div>
             <div class="col-md-2 d-flex align-items-end">
               <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="removeDomain(this)">
@@ -347,25 +353,30 @@
   // ── Multi-domain management ─────────────────────────────────────────────────
   let _domainIdx = <%= (tenant.domains || []).length %>;
 
-  function domainRowHtml(idx, domain, policy) {
+  function domainRowHtml(idx, domain, policy, color) {
     const opts = ['none','quarantine','reject'].map(v =>
       `<option value="${v}"${v === policy ? ' selected' : ''}>${v}</option>`
     ).join('');
     return `
       <div class="domain-row mb-2 p-3 rounded" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);">
         <div class="row g-2 align-items-end mb-2">
-          <div class="col-md-6">
+          <div class="col-md-5">
             <label class="form-label small mb-1">Domain</label>
             <input type="text" class="form-control form-control-sm domain-input"
                    name="domains[${idx}][domain]" value="${escAttr(domain)}"
                    placeholder="yourdomain.com"
                    oninput="updateRowPreview(this.closest('.domain-row'))" />
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label small mb-1">Policy <span class="text-secondary fw-normal">(p=)</span></label>
             <select class="form-select form-select-sm policy-select"
                     name="domains[${idx}][policy]"
                     onchange="updateRowPreview(this.closest('.domain-row'))">${opts}</select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small mb-1">Color</label>
+            <input type="color" class="form-control form-control-sm form-control-color w-100 color-input"
+                   name="domains[${idx}][color]" value="${escAttr(color)}" />
           </div>
           <div class="col-md-2 d-flex align-items-end">
             <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="removeDomain(this)">
@@ -391,8 +402,9 @@
   }
 
   function addDomain() {
+    const defaultColor = document.querySelector('[name="color"]').value || '#0a84ff';
     const div = document.createElement('div');
-    div.innerHTML = domainRowHtml(_domainIdx++, '', 'none');
+    div.innerHTML = domainRowHtml(_domainIdx++, '', 'none', defaultColor);
     document.getElementById('domainList').appendChild(div.firstElementChild);
     reindex();
   }
@@ -406,6 +418,7 @@
     document.querySelectorAll('#domainList .domain-row').forEach((row, i) => {
       row.querySelector('.domain-input').name  = `domains[${i}][domain]`;
       row.querySelector('.policy-select').name = `domains[${i}][policy]`;
+      row.querySelector('.color-input').name   = `domains[${i}][color]`;
       updateRowPreview(row);
     });
   }

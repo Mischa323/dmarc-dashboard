@@ -184,6 +184,10 @@ function _migrate(db) {
   if (!tenantCols.includes('fetch_interval_override')) db.exec('ALTER TABLE sso_tenants ADD COLUMN fetch_interval_override INTEGER');
   if (!tenantCols.includes('color'))                   db.exec('ALTER TABLE sso_tenants ADD COLUMN color TEXT');
 
+  // tenant_domains
+  const tdCols = db.pragma('table_info(tenant_domains)').map(c => c.name);
+  if (!tdCols.includes('color')) db.exec('ALTER TABLE tenant_domains ADD COLUMN color TEXT');
+
   // reports
   if (!db.pragma('table_info(reports)').map(c => c.name).includes('tenant_db_id')) {
     try { db.exec('ALTER TABLE reports ADD COLUMN tenant_db_id INTEGER REFERENCES sso_tenants(id) ON DELETE SET NULL'); } catch {}

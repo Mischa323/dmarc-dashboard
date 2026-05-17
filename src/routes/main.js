@@ -73,10 +73,10 @@ router.get('/reports', (req, res) => {
     });
   }
 
-  // Build domain colour map
+  // Build domain colour map (domain color overrides tenant color for badge display)
   const DOMAIN_PALETTE = ['#0a84ff','#30d158','#bf5af2','#ff9f0a','#64d2ff','#ff6961','#5ac8fa','#ffd60a'];
   const tenantRows = db.prepare(`
-    SELECT td.domain, COALESCE(t.color, NULL) AS color, t.id
+    SELECT td.domain, COALESCE(td.color, t.color) AS color
     FROM tenant_domains td JOIN sso_tenants t ON td.tenant_id = t.id
   `).all();
   const domainColors = {};
