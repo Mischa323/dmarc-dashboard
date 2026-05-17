@@ -46,6 +46,22 @@
   </div></div>
 </div>
 
+<% const spfOnlyPassCount = report.records.reduce((sum, r) => sum + (r.dmarc_pass && r.spf_aligned === 'pass' && r.dkim_aligned !== 'pass' ? r.count : 0), 0); %>
+<% if (spfOnlyPassCount > 0) { %>
+<div class="alert mb-4 d-flex gap-3" style="background:rgba(255,159,10,.1);border:1px solid rgba(255,159,10,.35);border-radius:12px;padding:16px 20px;">
+  <div style="font-size:20px;line-height:1.3;">⚠</div>
+  <div>
+    <div class="fw-semibold mb-1" style="color:#ff9f0a;">DMARC passed via SPF only — no valid DKIM signature</div>
+    <div class="small text-secondary">
+      <%= spfOnlyPassCount.toLocaleString() %> message<%= spfOnlyPassCount !== 1 ? 's' : '' %> passed DMARC because SPF alignment succeeded, but DKIM alignment failed.
+      This means your domain is not protected by a cryptographic email signature.
+      If SPF breaks (e.g. forwarded mail, cloud relay), these messages will fail DMARC entirely.
+      Consider adding or fixing your DKIM configuration.
+    </div>
+  </div>
+</div>
+<% } %>
+
 <!-- Policy details -->
 <div class="card p-3 mb-4">
   <h6 class="text-secondary mb-3">Published policy</h6>

@@ -75,26 +75,37 @@
 
     /* ── Glass cards ──────────────────────────────────────────────────────── */
     .card {
-      background: rgba(255,255,255,.055);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid rgba(255,255,255,.09) !important;
+      background: linear-gradient(135deg, rgba(255,255,255,.09) 0%, rgba(255,255,255,.04) 100%);
+      backdrop-filter: blur(48px) saturate(220%) brightness(1.06);
+      -webkit-backdrop-filter: blur(48px) saturate(220%) brightness(1.06);
+      border: 1px solid rgba(255,255,255,.14) !important;
       border-radius: 18px !important;
-      box-shadow: 0 2px 24px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.06);
-      transition: box-shadow .2s, border-color .2s;
+      box-shadow:
+        0 4px 32px rgba(0,0,0,.45),
+        0 1px 0 rgba(255,255,255,.04) inset,
+        inset 0 1px 0 rgba(255,255,255,.16),
+        inset 1px 0 0 rgba(255,255,255,.06);
+      transition: box-shadow .2s, border-color .2s, background .2s;
     }
-    .card:hover { box-shadow: 0 4px 36px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.09); }
+    .card:hover {
+      background: linear-gradient(135deg, rgba(255,255,255,.12) 0%, rgba(255,255,255,.055) 100%);
+      border-color: rgba(255,255,255,.22) !important;
+      box-shadow:
+        0 8px 48px rgba(0,0,0,.55),
+        inset 0 1px 0 rgba(255,255,255,.22),
+        inset 1px 0 0 rgba(255,255,255,.08);
+    }
     .card-pass {
-      background: rgba(var(--clr-pass-rgb), .06) !important;
-      border-color: rgba(var(--clr-pass-rgb), .28) !important;
+      background: linear-gradient(135deg, rgba(var(--clr-pass-rgb),.1) 0%, rgba(var(--clr-pass-rgb),.04) 100%) !important;
+      border-color: rgba(var(--clr-pass-rgb), .32) !important;
     }
     .card-fail {
-      background: rgba(var(--clr-fail-rgb), .06) !important;
-      border-color: rgba(var(--clr-fail-rgb), .28) !important;
+      background: linear-gradient(135deg, rgba(var(--clr-fail-rgb),.1) 0%, rgba(var(--clr-fail-rgb),.04) 100%) !important;
+      border-color: rgba(var(--clr-fail-rgb), .32) !important;
     }
     .card-warn {
-      background: rgba(var(--clr-warn-rgb), .06) !important;
-      border-color: rgba(var(--clr-warn-rgb), .28) !important;
+      background: linear-gradient(135deg, rgba(var(--clr-warn-rgb),.1) 0%, rgba(var(--clr-warn-rgb),.04) 100%) !important;
+      border-color: rgba(var(--clr-warn-rgb), .32) !important;
     }
 
     /* ── Tables ───────────────────────────────────────────────────────────── */

@@ -112,21 +112,10 @@ function _createSchema(db) {
       value TEXT NOT NULL
     );
 
-    -- Email report groups
+    -- Email report groups (transport + schedule are global settings)
     CREATE TABLE IF NOT EXISTS email_report_groups (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       name             TEXT NOT NULL,
-      schedule         TEXT DEFAULT 'weekly',
-      send_time        TEXT DEFAULT '08:00',
-      send_day         INTEGER DEFAULT 1,
-      transport        TEXT DEFAULT 'smtp',
-      graph_tenant_id  INTEGER REFERENCES sso_tenants(id) ON DELETE SET NULL,
-      smtp_host        TEXT,
-      smtp_port        INTEGER DEFAULT 587,
-      smtp_secure      INTEGER DEFAULT 0,
-      smtp_user        TEXT,
-      smtp_pass        TEXT,
-      smtp_from        TEXT,
       domains_filter   TEXT DEFAULT 'all',
       enabled          INTEGER DEFAULT 1,
       last_sent_daily  TEXT,
@@ -140,6 +129,21 @@ function _createSchema(db) {
       email    TEXT NOT NULL,
       UNIQUE(group_id, email)
     );
+
+    CREATE TABLE IF NOT EXISTS group_members (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id    INTEGER NOT NULL REFERENCES email_report_groups(id) ON DELETE CASCADE,
+      member_type TEXT NOT NULL,
+      member_id   INTEGER NOT NULL,
+      UNIQUE(group_id, member_type, member_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS group_tenants (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id  INTEGER NOT NULL REFERENCES email_report_groups(id) ON DELETE CASCADE,
+      tenant_id INTEGER NOT NULL REFERENCES sso_tenants(id) ON DELETE CASCADE,
+      UNIQUE(group_id, tenant_id)
+    );
   `);
 }
 
@@ -149,6 +153,16 @@ function _migrate(db) {
   if (!localCols.includes('totp_secret'))  db.exec('ALTER TABLE local_users ADD COLUMN totp_secret TEXT');
   if (!localCols.includes('totp_enabled')) db.exec('ALTER TABLE local_users ADD COLUMN totp_enabled INTEGER DEFAULT 0');
   if (!localCols.includes('role'))         db.exec("ALTER TABLE local_users ADD COLUMN role TEXT DEFAULT 'local_admin'");
+  if (!localCols.includes('email'))        db.exec('ALTER TABLE local_users ADD COLUMN email TEXT');
+
+  // email_report_groups
+  const groupCols = db.pragma('table_info(email_report_groups)').map(c => c.name);
+  if (!groupCols.includes('email_notifications')) db.exec('ALTER TABLE email_report_groups ADD COLUMN email_notifications INTEGER DEFAULT 0');
+  if (!groupCols.includes('schedule'))            db.exec("ALTER TABLE email_report_groups ADD COLUMN schedule TEXT DEFAULT 'none'");
+  if (!groupCols.includes('role'))                db.exec("ALTER TABLE email_report_groups ADD COLUMN role TEXT DEFAULT 'viewer'");
+  if (!groupCols.includes('send_time'))           db.exec("ALTER TABLE email_report_groups ADD COLUMN send_time TEXT DEFAULT '08:00'");
+  if (!groupCols.includes('send_day'))            db.exec('ALTER TABLE email_report_groups ADD COLUMN send_day INTEGER DEFAULT 1');
+  if (!groupCols.includes('send_month_day'))      db.exec('ALTER TABLE email_report_groups ADD COLUMN send_month_day INTEGER DEFAULT 1');
 
   // sso_tenants
   const tenantCols = db.pragma('table_info(sso_tenants)').map(c => c.name);
@@ -185,9 +199,22 @@ function setSetting(db, key, value) {
   db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, String(value));
 }
 
+function purgeOldReports(db, days) {
+  const d = parseInt(days, 10);
+  if (!d || d <= 0) return 0;
+  const result = db.prepare(
+    `DELETE FROM reports WHERE end_date < datetime('now', ?)`
+  ).run(`-${d} days`);
+  return result.changes;
+}
+
+function getDbPath() {
+  return path.resolve(process.env.DATABASE_URL || 'dmarc.db');
+}
+
 function _reset() {
   if (_db) { try { _db.close(); } catch { /* ignore */ } }
   _db = null;
 }
 
-module.exports = { getDb, getSetting, setSetting, _reset };
+module.exports = { getDb, getSetting, setSetting, purgeOldReports, getDbPath, _reset };

@@ -41,6 +41,12 @@
                  style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
                  placeholder="repeat password" minlength="8" required />
         </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-medium">Email <span class="text-secondary fw-normal">(optional)</span></label>
+          <input type="email" name="email" class="form-control form-control-sm"
+                 style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
+                 placeholder="user@example.com" />
+        </div>
         <div class="col-md-2">
           <label class="form-label small fw-medium">Role</label>
           <select name="role" class="form-select form-select-sm"
@@ -67,6 +73,7 @@
       <thead>
         <tr>
           <th>Username</th>
+          <th>Email</th>
           <th>Role</th>
           <th>2FA</th>
           <th>Created</th>
@@ -82,17 +89,21 @@
             <span class="badge ms-1" style="background:rgba(255,214,10,.1);color:#ffd60a;border:1px solid rgba(255,214,10,.2);font-size:.7rem;">local admin</span>
             <% } %>
           </td>
-          <td>
-            <% if (u.role === 'local_admin') { %>
-            <span class="text-secondary small">local_admin</span>
-            <% } else { %>
-            <form method="post" action="/admin/local-users/<%= u.id %>/role" class="d-inline">
-              <select name="role" class="form-select form-select-sm" style="width:auto;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
-                      onchange="this.form.submit()">
-                <option value="viewer" <%= u.role === 'viewer' ? 'selected' : '' %>>viewer</option>
-                <option value="admin"  <%= u.role === 'admin'  ? 'selected' : '' %>>admin</option>
-              </select>
+          <td class="small">
+            <form method="post" action="/admin/local-users/<%= u.id %>/email" class="d-flex align-items-center gap-1">
+              <input type="email" name="email" value="<%= u.email || '' %>"
+                     class="form-control form-control-sm" style="min-width:180px;background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08);color:rgba(255,255,255,.8);"
+                     placeholder="not set" />
+              <button type="submit" class="btn btn-sm btn-outline-secondary px-2" title="Save email">
+                <i class="bi bi-check-lg"></i>
+              </button>
             </form>
+          </td>
+          <td class="small text-secondary">
+            <% if (u.role === 'local_admin') { %>
+            <span class="badge" style="background:rgba(255,214,10,.1);color:#ffd60a;border:1px solid rgba(255,214,10,.2);">local_admin</span>
+            <% } else { %>
+            <span class="text-secondary">via groups</span>
             <% } %>
           </td>
           <td class="small">
@@ -153,15 +164,7 @@
             <div class="text-secondary" style="font-size:.8rem;"><%= u.email %></div>
           </td>
           <td class="small text-secondary"><%= u.tenant_name || '—' %></td>
-          <td>
-            <form method="post" action="/admin/users/<%= u.id %>/role" class="d-flex align-items-center gap-1">
-              <select name="role" class="form-select form-select-sm" style="width:auto;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
-                      onchange="this.form.submit()">
-                <option value="viewer" <%= u.role === 'viewer' ? 'selected' : '' %>>viewer</option>
-                <option value="admin"  <%= u.role === 'admin'  ? 'selected' : '' %>>admin</option>
-              </select>
-            </form>
-          </td>
+          <td class="small text-secondary">via groups</td>
           <td class="small text-secondary"><%= u.last_login ? u.last_login.slice(0, 16).replace('T', ' ') : 'Never' %></td>
           <td class="text-end">
             <form method="post" action="/admin/users/<%= u.id %>/delete"
@@ -181,14 +184,14 @@
   <h6 class="text-secondary small mb-2 fw-semibold text-uppercase" style="letter-spacing:.05em">Roles</h6>
   <div class="row g-2 small text-secondary">
     <div class="col-md-4"><strong class="text-light">local_admin</strong> — full access including 2FA and danger zone. Created during setup.</div>
-    <div class="col-md-4"><strong class="text-light">admin</strong> — full access including tenant/user management, but not danger zone.</div>
-    <div class="col-md-4"><strong class="text-light">viewer</strong> — read-only access to dashboard and reports.</div>
+    <div class="col-md-4"><strong class="text-light">admin</strong> — full access including tenant/user management. Set per group.</div>
+    <div class="col-md-4"><strong class="text-light">viewer</strong> — read-only access to dashboard and reports. Set per group.</div>
   </div>
 </div>
 
-<!-- Email Report Groups -->
+<!-- Security Groups -->
 <div class="d-flex align-items-center mt-5 mb-3 gap-3">
-  <h5 class="mb-0 fw-bold">Email Report Groups</h5>
+  <h5 class="mb-0 fw-bold">Security Groups</h5>
   <a href="/admin/email-reports/new" class="btn btn-sm btn-success ms-auto">
     <i class="bi bi-plus-lg me-1"></i>Add group
   </a>
@@ -196,8 +199,8 @@
 
 <% if (emailGroups.length === 0) { %>
 <div class="card p-4 text-center text-secondary">
-  <i class="bi bi-envelope-paper mb-2" style="font-size:1.6rem;"></i>
-  <p class="mb-2 small">No email report groups configured yet.</p>
+  <i class="bi bi-people mb-2" style="font-size:1.6rem;"></i>
+  <p class="mb-2 small">No groups configured yet.</p>
   <a href="/admin/email-reports/new" class="btn btn-sm btn-success">Create first group</a>
 </div>
 <% } else { %>
@@ -207,10 +210,10 @@
       <thead>
         <tr>
           <th>Name</th>
+          <th>Role</th>
+          <th>Tenants</th>
+          <th>Users</th>
           <th>Schedule</th>
-          <th>Transport</th>
-          <th>Recipients</th>
-          <th>Status</th>
           <th></th>
         </tr>
       </thead>
@@ -219,28 +222,25 @@
         <tr id="er-row-<%= g.id %>">
           <td class="fw-semibold small"><%= g.name %></td>
           <td class="small">
+            <% if (g.role === 'admin') { %>
+            <span class="badge" style="background:rgba(255,159,10,.12);color:#ff9f0a;border:1px solid rgba(255,159,10,.22);">admin</span>
+            <% } else { %>
+            <span class="badge bg-secondary bg-opacity-25 text-secondary">viewer</span>
+            <% } %>
+          </td>
+          <td class="small text-secondary"><%= g.tenant_count %></td>
+          <td class="small text-secondary"><%= g.member_count %></td>
+          <td class="small">
             <% if (g.schedule === 'daily') { %>
             <span class="badge" style="background:rgba(10,132,255,.12);color:#0a84ff;border:1px solid rgba(10,132,255,.22);">Daily</span>
             <% } else if (g.schedule === 'weekly') { %>
             <span class="badge" style="background:rgba(48,209,88,.12);color:#30d158;border:1px solid rgba(48,209,88,.22);">Weekly</span>
+            <% } else if (g.schedule === 'monthly') { %>
+            <span class="badge" style="background:rgba(255,159,10,.12);color:#ff9f0a;border:1px solid rgba(255,159,10,.22);">Monthly</span>
+            <% } else if (g.schedule === 'both') { %>
+            <span class="badge" style="background:rgba(191,90,242,.12);color:#bf5af2;border:1px solid rgba(191,90,242,.22);">Daily + Weekly</span>
             <% } else { %>
-            <span class="badge" style="background:rgba(191,90,242,.12);color:#bf5af2;border:1px solid rgba(191,90,242,.22);">Daily+Weekly</span>
-            <% } %>
-            <span class="text-secondary ms-1" style="font-size:.75rem;"><%= g.send_time || '08:00' %> UTC</span>
-          </td>
-          <td class="small">
-            <% if (g.transport === 'graph') { %>
-            <span class="badge" style="background:rgba(10,132,255,.12);color:#0a84ff;border:1px solid rgba(10,132,255,.22);"><i class="bi bi-microsoft me-1"></i>Graph</span>
-            <% } else { %>
-            <span class="badge" style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.12);">SMTP</span>
-            <% } %>
-          </td>
-          <td class="small text-secondary"><%= g.recipient_count %></td>
-          <td>
-            <% if (g.enabled) { %>
-            <span class="badge badge-pass px-2 py-1">Active</span>
-            <% } else { %>
-            <span class="badge bg-secondary bg-opacity-25 text-secondary px-2 py-1">Disabled</span>
+            <span class="badge bg-secondary bg-opacity-25 text-secondary">Disabled</span>
             <% } %>
           </td>
           <td class="text-end" style="min-width:240px;">
@@ -251,10 +251,10 @@
               <button class="btn btn-sm btn-outline-secondary" onclick="erSendNow(<%= g.id %>, 'weekly')">
                 <i class="bi bi-send me-1"></i>Weekly
               </button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="erSendNow(<%= g.id %>, 'monthly')">
+                <i class="bi bi-send me-1"></i>Monthly
+              </button>
               <a href="/admin/email-reports/<%= g.id %>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
-              <form method="post" action="/admin/email-reports/<%= g.id %>/toggle" class="d-inline">
-                <button class="btn btn-sm btn-outline-secondary"><%= g.enabled ? 'Disable' : 'Enable' %></button>
-              </form>
               <form method="post" action="/admin/email-reports/<%= g.id %>/delete" class="d-inline"
                     onsubmit="return confirm('Delete \'<%= g.name %>\'?')">
                 <button class="btn btn-sm btn-outline-danger">Delete</button>

@@ -1,10 +1,10 @@
 <div class="mb-4">
-  <a href="/admin/email-reports" class="text-secondary text-decoration-none small">
-    <i class="bi bi-arrow-left me-1"></i>Back to email reports
+  <a href="/admin/users" class="text-secondary text-decoration-none small">
+    <i class="bi bi-arrow-left me-1"></i>Back to Users &amp; Security Groups
   </a>
 </div>
 
-<h4 class="fw-bold mb-4"><%= group.id ? 'Edit email report group' : 'New email report group' %></h4>
+<h4 class="fw-bold mb-4"><%= group.id ? 'Edit security group' : 'New security group' %></h4>
 
 <% if (error) { %>
 <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-4">
@@ -12,174 +12,158 @@
 </div>
 <% } %>
 
-<form method="post" action="<%= group.id ? '/admin/email-reports/' + group.id : '/admin/email-reports' %>" id="emailGroupForm">
-
+<form method="post" action="<%= group.id ? '/admin/email-reports/' + group.id : '/admin/email-reports' %>">
   <div class="row g-4">
     <div class="col-lg-7">
 
-      <!-- Basic -->
+      <!-- Name -->
       <div class="card p-4 mb-3">
         <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Group</h6>
         <div class="mb-3">
           <label class="form-label">Name <span class="text-danger">*</span></label>
-          <input type="text" class="form-control" name="name" value="<%= group.name %>" placeholder="e.g. Security team daily" required />
+          <input type="text" class="form-control" name="name" value="<%= group.name %>"
+                 placeholder="e.g. Security team" required />
         </div>
-        <div class="mb-0">
-          <label class="form-label">Domain scope</label>
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" id="domainsAll" name="domains_all" value="1"
-                   <%= group.domains_filter === 'all' || !group.domains_filter ? 'checked' : '' %>
-                   onchange="toggleDomainPicker(!this.checked)" />
-            <label class="form-check-label small" for="domainsAll">All domains</label>
-          </div>
-          <div id="domainPickerWrap" style="<%= group.domains_filter === 'all' || !group.domains_filter ? 'display:none;' : '' %>">
-            <% if (domains.length === 0) { %>
-            <p class="text-secondary small">No domains in database yet — fetch some reports first.</p>
-            <% } else { %>
-            <div class="d-flex flex-wrap gap-2">
-              <% for (const d of domains) { %>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="selected_domains" value="<%= d %>"
-                       id="dom-<%= d %>"
-                       <%= (group.domains_list || []).includes(d) ? 'checked' : '' %> />
-                <label class="form-check-label small" for="dom-<%= d %>"><%= d %></label>
-              </div>
-              <% } %>
-            </div>
-            <% } %>
-          </div>
-        </div>
-      </div>
 
-      <!-- Schedule -->
-      <div class="card p-4 mb-3">
-        <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Schedule</h6>
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label">Frequency</label>
-            <select class="form-select" name="schedule" onchange="toggleWeekday(this.value)">
-              <option value="daily"  <%= group.schedule === 'daily'  ? 'selected' : '' %>>Daily</option>
-              <option value="weekly" <%= group.schedule === 'weekly' ? 'selected' : '' %>>Weekly</option>
-              <option value="both"   <%= group.schedule === 'both'   ? 'selected' : '' %>>Daily + Weekly</option>
-            </select>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Send time (UTC)</label>
-            <input type="time" class="form-control" name="send_time" value="<%= group.send_time || '08:00' %>" />
-          </div>
-          <div class="col-md-4" id="weekdayWrap" style="<%= group.schedule === 'daily' ? 'display:none;' : '' %>">
-            <label class="form-label">Weekly on</label>
-            <select class="form-select" name="send_day">
-              <% ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].forEach((d, i) => { %>
-              <option value="<%= i %>" <%= (group.send_day == i) ? 'selected' : '' %>><%= d %></option>
-              <% }) %>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- Transport -->
-      <div class="card p-4 mb-3">
-        <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Transport</h6>
         <div class="mb-3">
-          <label class="form-label">Send via</label>
-          <select class="form-select" name="transport" onchange="toggleTransport(this.value)">
-            <option value="smtp"  <%= group.transport === 'smtp'  ? 'selected' : '' %>>SMTP</option>
-            <option value="graph" <%= group.transport === 'graph' ? 'selected' : '' %>>Microsoft Graph (send from tenant mailbox)</option>
+          <label class="form-label">Role</label>
+          <select class="form-select" name="role" style="max-width:220px;">
+            <option value="viewer" <%= group.role === 'viewer' || !group.role ? 'selected' : '' %>>viewer — read-only access</option>
+            <option value="admin"  <%= group.role === 'admin'  ? 'selected' : '' %>>admin — full access</option>
+          </select>
+          <div class="form-text">All users in this group receive this role.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Schedule</label>
+          <select class="form-select" name="schedule" style="max-width:220px;"
+                  onchange="toggleScheduleFields(this.value)">
+            <option value="none"    <%= group.schedule === 'none'    || !group.schedule ? 'selected' : '' %>>Disabled</option>
+            <option value="daily"   <%= group.schedule === 'daily'   ? 'selected' : '' %>>Daily</option>
+            <option value="weekly"  <%= group.schedule === 'weekly'  ? 'selected' : '' %>>Weekly</option>
+            <option value="monthly" <%= group.schedule === 'monthly' ? 'selected' : '' %>>Monthly</option>
+            <option value="both"    <%= group.schedule === 'both'    ? 'selected' : '' %>>Daily + Weekly</option>
           </select>
         </div>
 
-        <!-- SMTP fields -->
-        <div id="smtpFields" style="<%= group.transport === 'graph' ? 'display:none;' : '' %>">
-          <div class="row g-3 mb-3">
-            <div class="col-md-8">
-              <label class="form-label">SMTP host <span class="text-danger">*</span></label>
-              <input type="text" class="form-control font-monospace" name="smtp_host"
-                     value="<%= group.smtp_host %>" placeholder="smtp.office365.com" />
-            </div>
+        <div id="scheduleFields" style="<%= !group.schedule || group.schedule === 'none' ? 'display:none;' : '' %>">
+          <div class="row g-3 mb-0">
             <div class="col-md-4">
-              <label class="form-label">Port</label>
-              <input type="number" class="form-control" name="smtp_port"
-                     value="<%= group.smtp_port || 587 %>" min="1" max="65535" />
+              <label class="form-label">Send time</label>
+              <input type="time" class="form-control" name="send_time"
+                     value="<%= group.send_time || '08:00' %>" />
+              <div class="form-text">In the timezone configured in Settings.</div>
             </div>
-          </div>
-          <div class="mb-3">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="smtpSecure" name="smtp_secure" value="1"
-                     <%= group.smtp_secure ? 'checked' : '' %> />
-              <label class="form-check-label small" for="smtpSecure">Use TLS (port 465)</label>
+            <div class="col-md-4" id="sendDayWrap"
+                 style="<%= (group.schedule === 'daily' || group.schedule === 'monthly' || !group.schedule || group.schedule === 'none') ? 'display:none;' : '' %>">
+              <label class="form-label">Weekly on</label>
+              <select class="form-select" name="send_day">
+                <% ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].forEach((d, i) => { %>
+                <option value="<%= i %>" <%= (group.send_day == i) ? 'selected' : '' %>><%= d %></option>
+                <% }) %>
+              </select>
             </div>
-          </div>
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label class="form-label">Username</label>
-              <input type="text" class="form-control" name="smtp_user"
-                     value="<%= group.smtp_user %>" placeholder="Optional" autocomplete="off" />
+            <div class="col-md-4" id="sendMonthDayWrap"
+                 style="<%= group.schedule === 'monthly' ? '' : 'display:none;' %>">
+              <label class="form-label">Monthly on day</label>
+              <input type="number" class="form-control" name="send_month_day"
+                     min="1" max="28" value="<%= group.send_month_day || 1 %>" />
+              <div class="form-text">Day 1–28 to avoid month-end issues.</div>
             </div>
-            <div class="col-md-6">
-              <label class="form-label">Password</label>
-              <input type="password" class="form-control" name="smtp_pass"
-                     placeholder="<%= group.id ? 'Leave blank to keep existing' : 'Optional' %>"
-                     autocomplete="new-password" />
-            </div>
-          </div>
-          <div class="mb-0">
-            <label class="form-label">From address</label>
-            <input type="email" class="form-control" name="smtp_from"
-                   value="<%= group.smtp_from %>" placeholder="dmarc-reports@yourdomain.com" />
           </div>
         </div>
+      </div>
 
-        <!-- Graph fields -->
-        <div id="graphFields" style="<%= group.transport !== 'graph' ? 'display:none;' : '' %>">
-          <label class="form-label">Tenant <span class="text-danger">*</span></label>
-          <% if (tenants.length === 0) { %>
-          <p class="text-secondary small">No enabled tenants found. Add a tenant first.</p>
-          <% } else { %>
-          <select class="form-select" name="graph_tenant_id">
-            <option value="">— select tenant —</option>
-            <% for (const t of tenants) { %>
-            <option value="<%= t.id %>" <%= group.graph_tenant_id == t.id ? 'selected' : '' %>><%= t.name %></option>
-            <% } %>
-          </select>
-          <div class="form-text">The report email will be sent from that tenant's configured mailbox. Requires <code>Mail.Send</code> application permission in Azure.</div>
+      <!-- Tenants -->
+      <div class="card p-4 mb-3">
+        <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">
+          <i class="bi bi-building me-1"></i>Tenant access
+        </h6>
+        <% if (tenants.length === 0) { %>
+        <p class="text-secondary small mb-0">No enabled tenants found. Add a tenant first.</p>
+        <% } else { %>
+        <p class="text-secondary small mb-3">Users in this group have access to reports from these tenants.</p>
+        <div class="d-flex flex-wrap gap-3">
+          <% for (const t of tenants) { %>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="tenant_ids" value="<%= t.id %>"
+                   id="tenant-<%= t.id %>"
+                   <%= (group.tenant_ids || []).includes(t.id) ? 'checked' : '' %> />
+            <label class="form-check-label small" for="tenant-<%= t.id %>"><%= t.name %></label>
+          </div>
           <% } %>
         </div>
+        <% } %>
       </div>
 
-      <!-- Recipients -->
+      <!-- Users -->
       <div class="card p-4 mb-4">
-        <h6 class="text-secondary mb-1 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Recipients</h6>
-        <p class="text-secondary small mb-3">One email address per line.</p>
-        <textarea class="form-control font-monospace" id="recipientsArea" name="recipients" rows="4"
-                  placeholder="alice@example.com&#10;bob@example.com"
-                  style="font-size:.85rem;" oninput="syncRecipients()"><%= (group.recipients || []).join('\n') %></textarea>
-        <div id="hiddenRecipients"></div>
+        <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">
+          <i class="bi bi-people me-1"></i>Users
+        </h6>
+
+        <% const localMemberIds = (group.member_ids || []).filter(m => m.member_type === 'local').map(m => m.member_id); %>
+        <% const ssoMemberIds   = (group.member_ids || []).filter(m => m.member_type === 'sso').map(m => m.member_id); %>
+
+        <% if (localUsers.length > 0) { %>
+        <p class="text-secondary small mb-2">Local users</p>
+        <div class="d-flex flex-wrap gap-3 mb-3">
+          <% for (const u of localUsers) { %>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="member_local" value="<%= u.id %>"
+                   id="lu-<%= u.id %>"
+                   <%= localMemberIds.includes(u.id) ? 'checked' : '' %> />
+            <label class="form-check-label small" for="lu-<%= u.id %>">
+              <%= u.username %>
+              <% if (u.email) { %><span class="text-secondary">(<%= u.email %>)</span><% } else { %><span class="text-secondary fst-italic">no email</span><% } %>
+            </label>
+          </div>
+          <% } %>
+        </div>
+        <% } %>
+
+        <% if (ssoUsers.length > 0) { %>
+        <p class="text-secondary small mb-2">SSO users</p>
+        <div class="d-flex flex-wrap gap-3">
+          <% for (const u of ssoUsers) { %>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="member_sso" value="<%= u.id %>"
+                   id="su-<%= u.id %>"
+                   <%= ssoMemberIds.includes(u.id) ? 'checked' : '' %> />
+            <label class="form-check-label small" for="su-<%= u.id %>">
+              <%= u.display_name || u.email %>
+              <% if (u.display_name && u.email) { %><span class="text-secondary">(<%= u.email %>)</span><% } else if (!u.email) { %><span class="text-secondary fst-italic">no email</span><% } %>
+            </label>
+          </div>
+          <% } %>
+        </div>
+        <% } %>
+
+        <% if (localUsers.length === 0 && ssoUsers.length === 0) { %>
+        <p class="text-secondary small mb-0">No users found.</p>
+        <% } %>
       </div>
 
       <button type="submit" class="btn btn-success px-4">
         <i class="bi bi-check-lg me-1"></i><%= group.id ? 'Save changes' : 'Create group' %>
       </button>
-      <a href="/admin/email-reports" class="btn btn-link text-secondary ms-2">Cancel</a>
+      <a href="/admin/users" class="btn btn-link text-secondary ms-2">Cancel</a>
     </div>
 
     <!-- Help sidebar -->
     <div class="col-lg-5">
       <div style="position:sticky;top:1rem;">
         <div class="card p-4">
-          <h6 class="fw-semibold mb-3"><i class="bi bi-info-circle me-2 text-secondary"></i>What's included</h6>
+          <h6 class="fw-semibold mb-3"><i class="bi bi-info-circle me-2 text-secondary"></i>How groups work</h6>
           <ul class="small text-secondary mb-0 ps-3">
-            <li class="mb-1"><strong class="text-light">Summary stats</strong> — total messages, passed, failed, pass rate for the period</li>
-            <li class="mb-1"><strong class="text-light">Domain breakdown</strong> — per-domain pass/fail counts and rate</li>
-            <li class="mb-1"><strong class="text-light">Top failing IPs</strong> — source IPs sending the most failing messages</li>
-            <li><strong class="text-light">Failing orgs</strong> — reporting organisations with failures</li>
+            <li class="mb-2"><strong class="text-light">Tenant access</strong> — which tenants' reports are included in this group's emails</li>
+            <li class="mb-2"><strong class="text-light">Users</strong> — reports are sent to users' email addresses; users without an email address are skipped</li>
+            <li><strong class="text-light">Email notifications</strong> — when on, the global schedule sends reports to this group</li>
           </ul>
           <hr style="border-color:rgba(255,255,255,.07);" />
-          <h6 class="fw-semibold mb-2 small">Graph API: Mail.Send permission</h6>
           <p class="small text-secondary mb-0">
-            To send via Microsoft Graph, add the <code>Mail.Send</code> Application permission
-            to your Azure app registration and grant admin consent.
-            The email will appear to come from the tenant's configured mailbox address.
+            Mail server and time zone are configured in
+            <a href="/admin/settings" class="text-secondary">Settings</a>.
           </p>
         </div>
       </div>
@@ -188,34 +172,9 @@
 </form>
 
 <script>
-  function toggleTransport(val) {
-    document.getElementById('smtpFields').style.display  = val === 'graph' ? 'none' : '';
-    document.getElementById('graphFields').style.display = val === 'graph' ? '' : 'none';
+  function toggleScheduleFields(val) {
+    document.getElementById('scheduleFields').style.display    = val === 'none' ? 'none' : '';
+    document.getElementById('sendDayWrap').style.display       = (val === 'daily' || val === 'monthly') ? 'none' : '';
+    document.getElementById('sendMonthDayWrap').style.display  = val === 'monthly' ? '' : 'none';
   }
-
-  function toggleWeekday(val) {
-    document.getElementById('weekdayWrap').style.display = val === 'daily' ? 'none' : '';
-  }
-
-  function toggleDomainPicker(show) {
-    document.getElementById('domainPickerWrap').style.display = show ? '' : 'none';
-  }
-
-  // Convert the textarea to individual hidden inputs before submit so
-  // Express body-parser receives them as an array named "recipients".
-  function syncRecipients() {}
-
-  document.getElementById('emailGroupForm').addEventListener('submit', function () {
-    const wrap = document.getElementById('hiddenRecipients');
-    wrap.innerHTML = '';
-    const lines = document.getElementById('recipientsArea').value
-      .split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
-    // Disable textarea so it doesn't submit as "recipients" alongside the hidden inputs
-    document.getElementById('recipientsArea').disabled = true;
-    for (const email of lines) {
-      const inp = document.createElement('input');
-      inp.type = 'hidden'; inp.name = 'recipients'; inp.value = email;
-      wrap.appendChild(inp);
-    }
-  });
 </script>

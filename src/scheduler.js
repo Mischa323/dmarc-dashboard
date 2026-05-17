@@ -44,65 +44,78 @@ function startScheduler() {
 function _startEmailScheduler() {
   if (_emailTask) { _emailTask.stop(); _emailTask = null; }
 
-  // Check every minute if any email report group is due
   _emailTask = cron.schedule('* * * * *', async () => {
     try {
-      const { getDb } = require('./db');
+      const { getDb, getSetting } = require('./db');
       const db = getDb();
-      const groups = db.prepare(
-        "SELECT * FROM email_report_groups WHERE enabled = 1"
-      ).all();
-      if (!groups.length) return;
 
+      const timezone = getSetting(db, 'mail_timezone', 'UTC');
       const now = new Date();
       const nowUtc = now.toISOString();
-      const todayDate = nowUtc.slice(0, 10);
-      const nowTime = nowUtc.slice(11, 16);      // HH:MM
-      const todayDow = now.getUTCDay();           // 0=Sun..6=Sat
+
+      // Current time and date in the configured timezone
+      const nowTime   = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).format(now).replace(',', '').trim();
+      const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(now);
+      const dayName   = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'long' }).format(now);
+      const DOW       = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+      const todayDow  = DOW[dayName] ?? 0;
 
       const { sendGroupReport } = require('./reportMailer');
 
-      for (const group of groups) {
-        const sendTime = group.send_time || '08:00';
-        if (nowTime !== sendTime) continue;
-
-        const schedule = group.schedule || 'weekly';
-
-        if (schedule === 'daily' || schedule === 'both') {
-          const lastDaily = (group.last_sent_daily || '').slice(0, 10);
-          if (lastDaily !== todayDate) {
-            try {
-              const result = await sendGroupReport(group, db, 'daily');
-              db.prepare(
-                "UPDATE email_report_groups SET last_sent_daily = ? WHERE id = ?"
-              ).run(nowUtc, group.id);
-              if (!result.skipped) {
-                console.log(`[email] "${group.name}" daily report sent to ${result.recipients} recipient(s)`);
-              }
-            } catch (err) {
-              console.error(`[email] "${group.name}" daily failed: ${err.message}`);
-            }
-          }
+      const dailyGroups = db.prepare("SELECT * FROM email_report_groups WHERE schedule IN ('daily','both')").all();
+      for (const group of dailyGroups) {
+        if (nowTime !== (group.send_time || '08:00')) continue;
+        if ((group.last_sent_daily || '').slice(0, 10) === todayDate) continue;
+        try {
+          const result = await sendGroupReport(group, db, 'daily');
+          db.prepare('UPDATE email_report_groups SET last_sent_daily = ? WHERE id = ?').run(nowUtc, group.id);
+          if (!result.skipped) console.log(`[email] "${group.name}" daily sent to ${result.recipients} recipient(s)`);
+          else console.log(`[email] "${group.name}" daily skipped: ${result.reason}`);
+        } catch (err) {
+          console.error(`[email] "${group.name}" daily failed: ${err.message}`);
         }
+      }
 
-        if (schedule === 'weekly' || schedule === 'both') {
-          const sendDay = group.send_day ?? 1;
-          if (todayDow === sendDay) {
-            const lastWeekly = (group.last_sent_weekly || '').slice(0, 10);
-            if (lastWeekly !== todayDate) {
-              try {
-                const result = await sendGroupReport(group, db, 'weekly');
-                db.prepare(
-                  "UPDATE email_report_groups SET last_sent_weekly = ? WHERE id = ?"
-                ).run(nowUtc, group.id);
-                if (!result.skipped) {
-                  console.log(`[email] "${group.name}" weekly report sent to ${result.recipients} recipient(s)`);
-                }
-              } catch (err) {
-                console.error(`[email] "${group.name}" weekly failed: ${err.message}`);
-              }
-            }
-          }
+      const weeklyGroups = db.prepare("SELECT * FROM email_report_groups WHERE schedule IN ('weekly','both')").all();
+      for (const group of weeklyGroups) {
+        if (todayDow !== (group.send_day ?? 1)) continue;
+        if (nowTime !== (group.send_time || '08:00')) continue;
+        if ((group.last_sent_weekly || '').slice(0, 10) === todayDate) continue;
+        try {
+          const result = await sendGroupReport(group, db, 'weekly');
+          db.prepare('UPDATE email_report_groups SET last_sent_weekly = ? WHERE id = ?').run(nowUtc, group.id);
+          if (!result.skipped) console.log(`[email] "${group.name}" weekly sent to ${result.recipients} recipient(s)`);
+          else console.log(`[email] "${group.name}" weekly skipped: ${result.reason}`);
+        } catch (err) {
+          console.error(`[email] "${group.name}" weekly failed: ${err.message}`);
+        }
+      }
+
+      // Daily retention purge (once per calendar day in configured timezone)
+      const retentionDays = parseInt(getSetting(db, 'report_retention_days', '0')) || 0;
+      if (retentionDays > 0) {
+        const lastPurge = (getSetting(db, 'last_purge_date', '') || '').slice(0, 10);
+        if (lastPurge !== todayDate) {
+          const { purgeOldReports } = require('./db');
+          const deleted = purgeOldReports(db, retentionDays);
+          db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('last_purge_date', ?)").run(nowUtc);
+          if (deleted > 0) console.log(`[purge] Deleted ${deleted} report(s) older than ${retentionDays} days`);
+        }
+      }
+
+      const todayDom = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: timezone, day: 'numeric' }).format(now));
+      const monthlyGroups = db.prepare("SELECT * FROM email_report_groups WHERE schedule = 'monthly'").all();
+      for (const group of monthlyGroups) {
+        if (todayDom !== (group.send_month_day || 1)) continue;
+        if (nowTime !== (group.send_time || '08:00')) continue;
+        if ((group.last_sent_weekly || '').slice(0, 7) === todayDate.slice(0, 7)) continue;
+        try {
+          const result = await sendGroupReport(group, db, 'monthly');
+          db.prepare('UPDATE email_report_groups SET last_sent_weekly = ? WHERE id = ?').run(nowUtc, group.id);
+          if (!result.skipped) console.log(`[email] "${group.name}" monthly sent to ${result.recipients} recipient(s)`);
+          else console.log(`[email] "${group.name}" monthly skipped: ${result.reason}`);
+        } catch (err) {
+          console.error(`[email] "${group.name}" monthly failed: ${err.message}`);
         }
       }
     } catch (err) {

@@ -67,7 +67,7 @@ async function _sendViaGraph({ graphTenant, from, recipients, subject, html }) {
   }
 }
 
-async function testSmtpConfig({ smtpConfig, from, to }) {
+async function testSmtpConfig({ smtpConfig, from, to, subject, html }) {
   const transporter = nodemailer.createTransport({
     host: smtpConfig.host,
     port: Number(smtpConfig.port) || 587,
@@ -78,8 +78,8 @@ async function testSmtpConfig({ smtpConfig, from, to }) {
   await transporter.sendMail({
     from,
     to,
-    subject: 'DMARC Dashboard — SMTP test',
-    html: '<p>SMTP connection is working correctly.</p>',
+    subject: subject || 'DMARC Dashboard — SMTP test',
+    html:    html    || '<p>SMTP connection is working correctly.</p>',
   });
 }
 
