@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const logger = require('./logger');
 
 const _tasks = new Map();
 let _emailTask = null;
@@ -27,15 +28,15 @@ function startScheduler() {
       try {
         const { fetchAndStore } = require('./fetcher');
         const count = await fetchAndStore(tenant);
-        console.log(`[scheduler][${tenant.name}] Stored ${count} new report(s)`);
+        if (count > 0) logger.info('fetch', `"${tenant.name}" stored ${count} new report(s)`);
       } catch (err) {
-        console.error(`[scheduler][${tenant.name}] Error: ${err.message}`);
+        logger.error('fetch', `"${tenant.name}" failed: ${err.message}`);
       }
     });
 
     _tasks.set(tenant.id, task);
     const source = tenant.fetch_interval_override != null ? 'custom' : 'global';
-    console.log(`[scheduler] "${tenant.name}" scheduled every ${minutes}m (${source})`);
+    logger.info('scheduler', `"${tenant.name}" scheduled every ${minutes}m (${source})`);
   }
 
   _startEmailScheduler();
@@ -53,7 +54,6 @@ function _startEmailScheduler() {
       const now = new Date();
       const nowUtc = now.toISOString();
 
-      // Current time and date in the configured timezone
       const nowTime   = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).format(now).replace(',', '').trim();
       const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(now);
       const dayName   = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'long' }).format(now);
@@ -69,10 +69,10 @@ function _startEmailScheduler() {
         try {
           const result = await sendGroupReport(group, db, 'daily');
           db.prepare('UPDATE email_report_groups SET last_sent_daily = ? WHERE id = ?').run(nowUtc, group.id);
-          if (!result.skipped) console.log(`[email] "${group.name}" daily sent to ${result.recipients} recipient(s)`);
-          else console.log(`[email] "${group.name}" daily skipped: ${result.reason}`);
+          if (!result.skipped) logger.info('email', `"${group.name}" daily sent to ${result.recipients} recipient(s)`);
+          else logger.info('email', `"${group.name}" daily skipped: ${result.reason}`);
         } catch (err) {
-          console.error(`[email] "${group.name}" daily failed: ${err.message}`);
+          logger.error('email', `"${group.name}" daily failed: ${err.message}`);
         }
       }
 
@@ -84,10 +84,10 @@ function _startEmailScheduler() {
         try {
           const result = await sendGroupReport(group, db, 'weekly');
           db.prepare('UPDATE email_report_groups SET last_sent_weekly = ? WHERE id = ?').run(nowUtc, group.id);
-          if (!result.skipped) console.log(`[email] "${group.name}" weekly sent to ${result.recipients} recipient(s)`);
-          else console.log(`[email] "${group.name}" weekly skipped: ${result.reason}`);
+          if (!result.skipped) logger.info('email', `"${group.name}" weekly sent to ${result.recipients} recipient(s)`);
+          else logger.info('email', `"${group.name}" weekly skipped: ${result.reason}`);
         } catch (err) {
-          console.error(`[email] "${group.name}" weekly failed: ${err.message}`);
+          logger.error('email', `"${group.name}" weekly failed: ${err.message}`);
         }
       }
 
@@ -99,7 +99,7 @@ function _startEmailScheduler() {
           const { purgeOldReports } = require('./db');
           const deleted = purgeOldReports(db, retentionDays);
           db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('last_purge_date', ?)").run(nowUtc);
-          if (deleted > 0) console.log(`[purge] Deleted ${deleted} report(s) older than ${retentionDays} days`);
+          if (deleted > 0) logger.info('purge', `Deleted ${deleted} report(s) older than ${retentionDays} days`);
         }
       }
 
@@ -112,14 +112,42 @@ function _startEmailScheduler() {
         try {
           const result = await sendGroupReport(group, db, 'monthly');
           db.prepare('UPDATE email_report_groups SET last_sent_weekly = ? WHERE id = ?').run(nowUtc, group.id);
-          if (!result.skipped) console.log(`[email] "${group.name}" monthly sent to ${result.recipients} recipient(s)`);
-          else console.log(`[email] "${group.name}" monthly skipped: ${result.reason}`);
+          if (!result.skipped) logger.info('email', `"${group.name}" monthly sent to ${result.recipients} recipient(s)`);
+          else logger.info('email', `"${group.name}" monthly skipped: ${result.reason}`);
         } catch (err) {
-          console.error(`[email] "${group.name}" monthly failed: ${err.message}`);
+          logger.error('email', `"${group.name}" monthly failed: ${err.message}`);
+        }
+      }
+
+      // Azure AD user sync (daily or weekly)
+      const azureSyncSchedule = getSetting(db, 'azure_sync_schedule', 'off');
+      if (azureSyncSchedule === 'daily' || azureSyncSchedule === 'weekly') {
+        const lastSync = (getSetting(db, 'last_azure_sync_date', '') || '').slice(0, 10);
+        const daysSinceSync = lastSync
+          ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 86400000)
+          : 999;
+        const isDue = azureSyncSchedule === 'daily'
+          ? lastSync !== todayDate
+          : daysSinceSync >= 7;
+
+        if (isDue) {
+          const syncTenants = db.prepare('SELECT * FROM sso_tenants WHERE enabled = 1').all();
+          if (syncTenants.length > 0) {
+            db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('last_azure_sync_date', ?)").run(todayDate);
+            const { syncTenantUsers } = require('./azureSync');
+            for (const t of syncTenants) {
+              try {
+                const r = await syncTenantUsers(t, db);
+                logger.info('azure-sync', `"${t.name}" auto-sync: +${r.added} added, ~${r.updated} updated, -${r.removed} removed`);
+              } catch (err) {
+                logger.error('azure-sync', `"${t.name}" auto-sync failed: ${err.message}`);
+              }
+            }
+          }
         }
       }
     } catch (err) {
-      console.error(`[email scheduler] Error: ${err.message}`);
+      logger.error('scheduler', `Email scheduler error: ${err.message}`);
     }
   });
 }

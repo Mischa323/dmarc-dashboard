@@ -2,6 +2,13 @@ const express = require('express');
 const { getDb } = require('../db');
 const { getUserAccessToken } = require('../msalHelper');
 const { fetchAndStore } = require('../fetcher');
+const logger = require('../logger');
+
+function actor(req) {
+  const u = req.session && req.session.user;
+  if (!u) return 'unknown';
+  return u.email ? `${u.email} (${u.role})` : `${u.name} (${u.role})`;
+}
 
 const router = express.Router();
 
@@ -115,7 +122,11 @@ router.get('/reports/:id', (req, res) => {
   });
 });
 
-router.post('/fetch', async (req, res) => {
+router.post('/fetch', (req, res, next) => {
+  const role = req.session.user && req.session.user.role;
+  if (role === 'local_admin' || role === 'admin') return next();
+  res.status(403).json({ error: 'Admin access required.' });
+}, async (req, res) => {
   try {
     const db = getDb();
     let stored = 0;
@@ -129,6 +140,7 @@ router.post('/fetch', async (req, res) => {
       if (tenants.length === 0) return res.status(400).json({ error: 'No SSO tenants configured yet. Add one in Admin → Tenants.' });
       for (const tenant of tenants) stored += await fetchAndStore(tenant, null);
     }
+    logger.info('fetch', `[${actor(req)}] Manual fetch: stored ${stored} new report(s)`);
     res.json({ stored });
   } catch (err) {
     if (err.code === 'interaction_required' || err.name === 'InteractionRequiredAuthError') {

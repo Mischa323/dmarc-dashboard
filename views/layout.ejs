@@ -215,6 +215,7 @@
               <li><a class="dropdown-item" href="/admin"><i class="bi bi-speedometer2 me-2"></i>Overview</a></li>
               <li><a class="dropdown-item" href="/admin/tenants"><i class="bi bi-buildings me-2"></i>Tenants</a></li>
               <li><a class="dropdown-item" href="/admin/users"><i class="bi bi-people me-2"></i>Users &amp; Groups</a></li>
+              <li><a class="dropdown-item" href="/admin/logs"><i class="bi bi-journal-text me-2"></i>Logs</a></li>
               <% if (locals.user && user.role === 'local_admin') { %>
               <li><hr class="dropdown-divider" /></li>
               <li><a class="dropdown-item" href="/admin/settings"><i class="bi bi-sliders me-2"></i>Settings</a></li>
@@ -227,9 +228,11 @@
         </ul>
 
         <div class="d-flex align-items-center gap-2">
+          <% if (locals.user && (user.role === 'local_admin' || user.role === 'admin')) { %>
           <button class="btn btn-sm btn-outline-secondary" id="fetchBtn" onclick="triggerFetch()">
             <i class="bi bi-arrow-clockwise me-1"></i>Fetch now
           </button>
+          <% } %>
 
 <% if (locals.user) { %>
           <span class="text-secondary small d-none d-lg-inline" style="font-size:.82rem;">

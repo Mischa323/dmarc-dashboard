@@ -1,0 +1,168 @@
+<%
+function catIcon(cat) {
+  const icons = {
+    'scheduler':  '<i class="bi bi-clock"></i>',
+    'fetch':      '<i class="bi bi-cloud-download"></i>',
+    'azure-sync': '<i class="bi bi-microsoft"></i>',
+    'email':      '<i class="bi bi-envelope"></i>',
+    'purge':      '<i class="bi bi-trash"></i>',
+    'auth':       '<i class="bi bi-shield-lock"></i>',
+    'users':      '<i class="bi bi-person"></i>',
+    'groups':     '<i class="bi bi-people"></i>',
+    'tenants':    '<i class="bi bi-buildings"></i>',
+    'system':     '<i class="bi bi-gear"></i>',
+  };
+  return icons[cat] || '<i class="bi bi-dot"></i>';
+}
+%>
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+  <h4 class="mb-0 fw-bold">Activity Logs</h4>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <label class="d-flex align-items-center gap-2 small text-secondary" style="cursor:pointer;">
+      <input type="checkbox" id="autoRefresh" class="form-check-input" style="margin:0;" />
+      Auto-refresh
+    </label>
+    <% if (locals.user && user.role === 'local_admin') { %>
+    <button class="btn btn-sm btn-outline-danger" onclick="clearLogs()">
+      <i class="bi bi-trash me-1"></i>Clear logs
+    </button>
+    <% } %>
+  </div>
+</div>
+
+<% if (flash) { %>
+<div class="alert alert-success alert-dismissible py-2 mb-3" role="alert">
+  <i class="bi bi-check-circle me-1"></i><%= flash %>
+  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+</div>
+<% } %>
+
+<!-- Filters -->
+<div class="card p-3 mb-3">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <!-- Level -->
+    <div class="d-flex align-items-center gap-2">
+      <span class="small text-secondary">Level</span>
+      <div class="btn-group btn-group-sm">
+        <a href="?level=all&category=<%= category %>"
+           class="btn <%= level === 'all' ? 'btn-secondary' : 'btn-outline-secondary' %>">All</a>
+        <a href="?level=info&category=<%= category %>"
+           class="btn <%= level === 'info' ? 'btn-outline-primary' : 'btn-outline-secondary' %>"
+           style="<%= level === 'info' ? 'background:rgba(var(--clr-accent-rgb),.12);border-color:rgba(var(--clr-accent-rgb),.4);color:var(--clr-accent);' : '' %>">Info</a>
+        <a href="?level=warn&category=<%= category %>"
+           class="btn btn-outline-secondary"
+           style="<%= level === 'warn' ? 'background:rgba(var(--clr-warn-rgb),.12);border-color:rgba(var(--clr-warn-rgb),.4);color:var(--clr-warn);' : '' %>">Warn</a>
+        <a href="?level=error&category=<%= category %>"
+           class="btn btn-outline-secondary"
+           style="<%= level === 'error' ? 'background:rgba(var(--clr-fail-rgb),.12);border-color:rgba(var(--clr-fail-rgb),.4);color:var(--clr-fail);' : '' %>">Error</a>
+      </div>
+    </div>
+
+    <div style="width:1px;height:20px;background:rgba(255,255,255,.1);"></div>
+
+    <!-- Category -->
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="small text-secondary">Category</span>
+      <a href="?level=<%= level %>&category=all"
+         class="btn btn-sm <%= category === 'all' ? 'btn-secondary' : 'btn-outline-secondary' %>">All</a>
+      <% for (const cat of categories) { %>
+      <a href="?level=<%= level %>&category=<%= cat %>"
+         class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+         style="<%= category === cat ? 'background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:#fff;' : '' %>">
+        <%- catIcon(cat) %><%= cat %>
+      </a>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Log table -->
+<div class="card p-0" style="overflow:hidden;">
+  <% if (logs.length === 0) { %>
+  <div class="p-5 text-center text-secondary">
+    <i class="bi bi-journal-x" style="font-size:2rem;opacity:.3;"></i>
+    <div class="mt-2 small">No log entries<% if (level !== 'all' || category !== 'all') { %> matching these filters<% } %>.</div>
+  </div>
+  <% } else { %>
+  <div style="font-family:ui-monospace,'SF Mono','Cascadia Code',monospace;font-size:.8rem;">
+    <% for (const entry of logs) { %>
+    <div class="log-row d-flex align-items-start gap-3 px-4 py-2" data-level="<%= entry.level %>">
+      <span class="text-secondary flex-shrink-0" style="min-width:160px;font-size:.75rem;padding-top:1px;">
+        <%= new Date(entry.created_at).toISOString().replace('T',' ').slice(0,19) %> UTC
+      </span>
+      <span class="level-badge flex-shrink-0" data-l="<%= entry.level %>"></span>
+      <span class="cat-tag flex-shrink-0"><%- catIcon(entry.category) %><%= entry.category %></span>
+      <span class="log-msg"><%= entry.message %></span>
+    </div>
+    <% } %>
+  </div>
+  <% } %>
+</div>
+
+<div class="mt-2 text-secondary small">
+  Showing <%= logs.length %> entr<%= logs.length === 1 ? 'y' : 'ies' %> (max 300). Logs are kept for the most recent 1,000 entries.
+</div>
+
+<style>
+  .log-row {
+    border-bottom: 1px solid rgba(255,255,255,.04);
+    transition: background .1s;
+  }
+  .log-row:last-child { border-bottom: none; }
+  .log-row:hover { background: rgba(255,255,255,.03); }
+
+  .log-row[data-level="error"] { background: rgba(255,69,58,.04); }
+  .log-row[data-level="error"]:hover { background: rgba(255,69,58,.08); }
+  .log-row[data-level="warn"]  { background: rgba(255,159,10,.03); }
+  .log-row[data-level="warn"]:hover  { background: rgba(255,159,10,.07); }
+
+  .level-badge::before {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 5px;
+    font-size: .68rem;
+    font-weight: 600;
+    padding: 1px 7px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    min-width: 44px;
+    justify-content: center;
+  }
+  .level-badge[data-l="info"]::before  { content:'INFO';  background:rgba(10,132,255,.14);  color:#4da6ff; border:1px solid rgba(10,132,255,.25); }
+  .level-badge[data-l="warn"]::before  { content:'WARN';  background:rgba(255,159,10,.14);  color:#ff9f0a; border:1px solid rgba(255,159,10,.25); }
+  .level-badge[data-l="error"]::before { content:'ERROR'; background:rgba(255,69,58,.14);   color:#ff453a; border:1px solid rgba(255,69,58,.25); }
+
+  .cat-tag {
+    color: rgba(255,255,255,.45);
+    font-size: .74rem;
+    min-width: 100px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .log-msg { color: rgba(255,255,255,.8); word-break: break-word; }
+  .log-row[data-level="error"] .log-msg { color: rgba(255,150,143,.9); }
+  .log-row[data-level="warn"]  .log-msg { color: rgba(255,200,100,.9); }
+</style>
+
+<script>
+  let _refreshTimer = null;
+  document.getElementById('autoRefresh').addEventListener('change', function () {
+    if (this.checked) {
+      _refreshTimer = setInterval(() => location.reload(), 10000);
+    } else {
+      clearInterval(_refreshTimer);
+      _refreshTimer = null;
+    }
+  });
+
+  async function clearLogs() {
+    if (!confirm('Clear all log entries?')) return;
+    try {
+      await fetch('/admin/logs/clear', { method: 'POST' });
+      location.reload();
+    } catch {
+      alert('Failed to clear logs.');
+    }
+  }
+</script>

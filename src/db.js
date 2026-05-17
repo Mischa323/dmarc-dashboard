@@ -144,6 +144,16 @@ function _createSchema(db) {
       tenant_id INTEGER NOT NULL REFERENCES sso_tenants(id) ON DELETE CASCADE,
       UNIQUE(group_id, tenant_id)
     );
+
+    -- System activity log (rolling window, trimmed to 1000 entries)
+    CREATE TABLE IF NOT EXISTS admin_logs (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT DEFAULT (datetime('now')),
+      level      TEXT NOT NULL DEFAULT 'info',
+      category   TEXT NOT NULL DEFAULT 'system',
+      message    TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_admin_logs_id ON admin_logs(id DESC);
   `);
 }
 
@@ -153,7 +163,9 @@ function _migrate(db) {
   if (!localCols.includes('totp_secret'))  db.exec('ALTER TABLE local_users ADD COLUMN totp_secret TEXT');
   if (!localCols.includes('totp_enabled')) db.exec('ALTER TABLE local_users ADD COLUMN totp_enabled INTEGER DEFAULT 0');
   if (!localCols.includes('role'))         db.exec("ALTER TABLE local_users ADD COLUMN role TEXT DEFAULT 'local_admin'");
-  if (!localCols.includes('email'))        db.exec('ALTER TABLE local_users ADD COLUMN email TEXT');
+  if (!localCols.includes('email'))          db.exec('ALTER TABLE local_users ADD COLUMN email TEXT');
+  if (!localCols.includes('invite_token'))   db.exec('ALTER TABLE local_users ADD COLUMN invite_token TEXT');
+  if (!localCols.includes('invite_expires')) db.exec('ALTER TABLE local_users ADD COLUMN invite_expires TEXT');
 
   // email_report_groups
   const groupCols = db.pragma('table_info(email_report_groups)').map(c => c.name);

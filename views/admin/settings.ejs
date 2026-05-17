@@ -203,6 +203,29 @@
       </div>
     </div>
 
+    <!-- Azure AD sync -->
+    <div class="col-12">
+      <div class="card p-4">
+        <h6 class="text-secondary small fw-semibold text-uppercase mb-3" style="letter-spacing:.05em;">
+          <i class="bi bi-microsoft me-2"></i>Azure AD user sync
+        </h6>
+        <p class="text-secondary small mb-3">
+          Automatically import licensed Azure AD users from all enabled tenants on a schedule.
+          This keeps the SSO user list in sync without manual imports.
+          Requires the <code>User.Read.All</code> Application permission on each Azure App Registration.
+        </p>
+        <div class="mb-0">
+          <label class="form-label">Sync schedule</label>
+          <select class="form-select" name="azure_sync_schedule" style="max-width:220px;">
+            <option value="off"    <%= azureSyncSchedule === 'off'    ? 'selected' : '' %>>Off</option>
+            <option value="daily"  <%= azureSyncSchedule === 'daily'  ? 'selected' : '' %>>Daily</option>
+            <option value="weekly" <%= azureSyncSchedule === 'weekly' ? 'selected' : '' %>>Weekly</option>
+          </select>
+          <div class="form-text">When daily, the sync runs once per calendar day. When weekly, once every 7 days. Both run at midnight UTC.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Appearance -->
     <div class="col-12">
       <div class="card p-4">

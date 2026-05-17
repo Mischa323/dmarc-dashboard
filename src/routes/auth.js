@@ -204,4 +204,40 @@ router.get('/auth/logout', (req, res) => {
   });
 });
 
+// ── Invite acceptance ───────────────────────────────────────────────────────
+
+router.get('/auth/accept-invite', (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.redirect('/auth/login');
+  const db = getDb();
+  const user = db.prepare(
+    "SELECT * FROM local_users WHERE invite_token = ? AND invite_expires > datetime('now')"
+  ).get(token);
+  if (!user) return res.render('accept_invite', { layout: false, error: 'This invite link is invalid or has expired. Ask an administrator for a new one.', token: null, username: '' });
+  res.render('accept_invite', { layout: false, error: null, token, username: user.username });
+});
+
+router.post('/auth/accept-invite', async (req, res) => {
+  const { token, password, confirmPassword } = req.body;
+  const db = getDb();
+  const user = db.prepare(
+    "SELECT * FROM local_users WHERE invite_token = ? AND invite_expires > datetime('now')"
+  ).get(token);
+
+  const fail = (msg) => res.render('accept_invite', { layout: false, error: msg, token: token || null, username: user ? user.username : '' });
+
+  if (!user) return fail('This invite link is invalid or has expired.');
+  if (!password || password.length < 8) return fail('Password must be at least 8 characters.');
+  if (password !== confirmPassword) return fail('Passwords do not match.');
+
+  const hash = await bcrypt.hash(password, 12);
+  db.prepare('UPDATE local_users SET password_hash = ?, invite_token = NULL, invite_expires = NULL WHERE id = ?').run(hash, user.id);
+
+  const role = roleFromGroups(db, 'local', user.id, user.role || 'viewer');
+  req.session.userId   = user.id;
+  req.session.user     = { name: user.username, role };
+  req.session.userType = 'local';
+  res.redirect('/');
+});
+
 module.exports = router;

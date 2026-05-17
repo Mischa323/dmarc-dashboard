@@ -15,7 +15,10 @@
 <!-- Add local user form -->
 <div class="collapse mb-4" id="addLocalUser">
   <div class="card p-4">
-    <h6 class="fw-semibold mb-3">New local user</h6>
+    <h6 class="fw-semibold mb-1">New local user</h6>
+    <% if (mailConfigured) { %>
+    <p class="text-secondary small mb-3">Leave the password fields empty and provide an email address to send the user an invite link instead.</p>
+    <% } %>
     <% if (locals.error) { %>
     <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3">
       <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i><span><%= error %></span>
@@ -30,22 +33,10 @@
                  placeholder="username" minlength="3" required />
         </div>
         <div class="col-md-3">
-          <label class="form-label small fw-medium">Password</label>
-          <input type="password" name="password" class="form-control form-control-sm"
+          <label class="form-label small fw-medium">Email</label>
+          <input type="email" name="email" id="newUserEmail" class="form-control form-control-sm"
                  style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
-                 placeholder="min 8 characters" minlength="8" required />
-        </div>
-        <div class="col-md-3">
-          <label class="form-label small fw-medium">Confirm password</label>
-          <input type="password" name="confirmPassword" class="form-control form-control-sm"
-                 style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
-                 placeholder="repeat password" minlength="8" required />
-        </div>
-        <div class="col-md-3">
-          <label class="form-label small fw-medium">Email <span class="text-secondary fw-normal">(optional)</span></label>
-          <input type="email" name="email" class="form-control form-control-sm"
-                 style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
-                 placeholder="user@example.com" />
+                 placeholder="user@example.com" oninput="togglePasswordFields()" />
         </div>
         <div class="col-md-2">
           <label class="form-label small fw-medium">Role</label>
@@ -55,8 +46,26 @@
             <option value="admin">admin</option>
           </select>
         </div>
-        <div class="col-md-1 d-flex align-items-end">
-          <button type="submit" class="btn btn-sm btn-success w-100">Add</button>
+        <div id="passwordFields" class="col-12">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label small fw-medium">Password <% if (mailConfigured) { %><span class="text-secondary fw-normal">(or send invite)</span><% } %></label>
+              <input type="password" name="password" id="newUserPassword" class="form-control form-control-sm"
+                     style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
+                     placeholder="min 8 characters" minlength="8" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-medium">Confirm password</label>
+              <input type="password" name="confirmPassword" class="form-control form-control-sm"
+                     style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.9);"
+                     placeholder="repeat password" minlength="8" />
+            </div>
+          </div>
+        </div>
+        <div class="col-12 d-flex align-items-center gap-2">
+          <button type="submit" id="addUserBtn" class="btn btn-sm btn-success">
+            <i class="bi bi-person-plus me-1"></i><span id="addUserBtnLabel">Add user</span>
+          </button>
         </div>
       </div>
     </form>
@@ -87,6 +96,8 @@
             <i class="bi bi-person-circle me-1 text-secondary"></i><%= u.username %>
             <% if (u.role === 'local_admin') { %>
             <span class="badge ms-1" style="background:rgba(255,214,10,.1);color:#ffd60a;border:1px solid rgba(255,214,10,.2);font-size:.7rem;">local admin</span>
+            <% } else if (u.invite_pending) { %>
+            <span class="badge ms-1" style="background:rgba(255,159,10,.1);color:#ff9f0a;border:1px solid rgba(255,159,10,.2);font-size:.7rem;"><i class="bi bi-envelope me-1"></i>invite pending</span>
             <% } %>
           </td>
           <td class="small">
@@ -119,12 +130,19 @@
           </td>
           <td class="small text-secondary"><%= u.created_at ? u.created_at.slice(0, 10) : '—' %></td>
           <td class="text-end">
-            <% if (u.role !== 'local_admin') { %>
-            <form method="post" action="/admin/local-users/<%= u.id %>/delete"
-                  onsubmit="return confirm('Delete user \'<%= u.username %>\'?')">
-              <button class="btn btn-sm btn-outline-danger">Delete</button>
-            </form>
-            <% } %>
+            <div class="d-flex gap-1 justify-content-end">
+              <% if (u.invite_pending && u.email) { %>
+              <button class="btn btn-sm btn-outline-secondary" onclick="resendInvite(<%= u.id %>, this)" title="Resend invite email">
+                <i class="bi bi-envelope-arrow-up me-1"></i>Resend invite
+              </button>
+              <% } %>
+              <% if (u.role !== 'local_admin') { %>
+              <form method="post" action="/admin/local-users/<%= u.id %>/delete"
+                    onsubmit="return confirm('Delete user \'<%= u.username %>\'?')">
+                <button class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+              <% } %>
+            </div>
           </td>
         </tr>
         <% } %>
@@ -134,9 +152,23 @@
 </div>
 
 <!-- SSO users -->
-<h6 class="text-secondary small fw-semibold text-uppercase mb-2" style="letter-spacing:.05em;">
-  <i class="bi bi-microsoft me-1"></i>SSO users (<%= ssoUsers.length %>)
-</h6>
+<div class="d-flex align-items-center justify-content-between mb-2">
+  <h6 class="text-secondary small fw-semibold text-uppercase mb-0" style="letter-spacing:.05em;">
+    <i class="bi bi-microsoft me-1"></i>SSO users (<%= ssoUsers.length %>)
+  </h6>
+  <% if (ssoTenants.length > 0) { %>
+  <div class="d-flex align-items-center gap-2">
+    <span class="text-secondary" style="font-size:.78rem;">Import from Azure AD:</span>
+    <% for (const t of ssoTenants) { %>
+    <button class="btn btn-sm btn-outline-secondary" onclick="importAzureUsers(<%= t.id %>, '<%= t.name.replace(/'/g, '\\\'') %>', this)">
+      <i class="bi bi-cloud-download me-1"></i><%= t.name %>
+    </button>
+    <% } %>
+    <div id="importResult" style="display:none;"></div>
+  </div>
+  <% } %>
+</div>
+<div class="form-text mb-3" style="margin-top:-4px;">Import pre-populates users so they can be added to security groups before their first login. Requires <code>User.Read.All</code> Application permission in Azure.</div>
 
 <% if (ssoUsers.length === 0) { %>
 <div class="card p-4 text-center text-secondary">
@@ -275,6 +307,64 @@
 <% } %>
 
 <script>
+  <% if (mailConfigured) { %>
+  function togglePasswordFields() {
+    const email = document.getElementById('newUserEmail').value.trim();
+    const pwd   = document.getElementById('newUserPassword');
+    const btn   = document.getElementById('addUserBtnLabel');
+    if (email) {
+      pwd.removeAttribute('required');
+      btn.textContent = pwd.value ? 'Add user' : 'Send invite';
+    } else {
+      pwd.setAttribute('required', '');
+      btn.textContent = 'Add user';
+    }
+  }
+  document.getElementById('newUserPassword').addEventListener('input', () => {
+    document.getElementById('addUserBtnLabel').textContent = document.getElementById('newUserPassword').value ? 'Add user' : (document.getElementById('newUserEmail').value.trim() ? 'Send invite' : 'Add user');
+  });
+  <% } %>
+
+  async function resendInvite(id, btn) {
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
+    const r = await fetch('/admin/local-users/' + id + '/resend-invite', { method: 'POST' });
+    const d = await r.json();
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    if (d.ok) { btn.style.color = 'var(--bs-success)'; setTimeout(() => btn.style.color = '', 2000); }
+    else alert('Error: ' + d.error);
+  }
+
+  async function importAzureUsers(tenantId, tenantName, btn) {
+    const result = document.getElementById('importResult');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + tenantName;
+    result.style.display = 'none';
+    try {
+      const r = await fetch('/admin/tenants/' + tenantId + '/import-users', { method: 'POST' });
+      const d = await r.json();
+      result.style.display = '';
+      if (d.ok) {
+        const parts = [`${d.added} added`, `${d.updated} updated`];
+        if (d.removed > 0) parts.push(`${d.removed} removed`);
+        result.innerHTML = `<span class="small" style="color:#30d158;"><i class="bi bi-check-circle me-1"></i>${tenantName}: ${parts.join(', ')}. Reloading…</span>`;
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        result.innerHTML = `<div class="d-flex align-items-start gap-2 mt-2 p-3" style="background:rgba(255,69,58,.08);border:1px solid rgba(255,69,58,.25);border-radius:10px;max-width:540px;">
+          <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" style="color:#ff453a;font-size:.9rem;"></i>
+          <span class="small" style="color:#ff453a;">${escHtml(d.error)}</span>
+        </div>`;
+      }
+    } catch {
+      result.style.display = '';
+      result.innerHTML = `<span class="small" style="color:#ff453a;"><i class="bi bi-exclamation-triangle me-1"></i>Request failed.</span>`;
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i>' + tenantName;
+  }
+
   async function erSendNow(id, period) {
     const row    = document.getElementById('er-result-row-' + id);
     const result = document.getElementById('er-result-' + id);
