@@ -35,6 +35,8 @@ function createApp() {
     next();
   });
 
+  app.get('/favicon.ico', (req, res) => res.status(204).end());
+
   app.use((req, res, next) => {
     const isPublic =
       SETUP_PATHS.some(p => req.path.startsWith(p)) ||
@@ -43,7 +45,9 @@ function createApp() {
 
     if (!isConfigured()) return res.redirect('/setup/1');
     if (!req.session.userId) {
-      req.session.returnTo = req.originalUrl;
+      if (req.method === 'GET' && req.accepts('html')) {
+        req.session.returnTo = req.originalUrl;
+      }
       return res.redirect('/auth/login');
     }
     next();
