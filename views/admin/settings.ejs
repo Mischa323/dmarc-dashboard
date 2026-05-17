@@ -12,6 +12,25 @@
 <form method="post" action="/admin/settings" onsubmit="saveTheme()" style="max-width:760px;">
   <div class="row g-4">
 
+    <!-- Server URL -->
+    <div class="col-12">
+      <div class="card p-4">
+        <h6 class="text-secondary small fw-semibold text-uppercase mb-3" style="letter-spacing:.05em;">
+          <i class="bi bi-globe2 me-2"></i>Server URL
+        </h6>
+        <div class="mb-0">
+          <label class="form-label" for="server_base_url">Public base URL</label>
+          <input type="url" class="form-control font-monospace" id="server_base_url"
+                 name="server_base_url" value="<%= serverBaseUrl %>"
+                 placeholder="https://dmarc.yourdomain.com" style="max-width:420px;" />
+          <div class="form-text">
+            Used in invite emails and other outgoing links. Include the protocol, no trailing slash.
+            If left blank, links are built from the incoming request host (unreliable behind proxies).
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Fetch schedule -->
     <div class="col-12">
       <div class="card p-4">

@@ -42,11 +42,20 @@ router.use(requireAnyAdmin);
 
 router.get('/', (req, res) => {
   const db = getDb();
+  const localAdmin = db.prepare('SELECT totp_enabled FROM local_users WHERE role = ? LIMIT 1').get('local_admin');
+  const mailTransport = getSetting(db, 'mail_transport', 'smtp');
+  const mailHost     = getSetting(db, 'mail_smtp_host', '');
+  const mailGraphId  = getSetting(db, 'mail_graph_tenant_id', '');
   const stats = {
-    tenants: db.prepare('SELECT COUNT(*) as n FROM sso_tenants').get().n,
-    users: db.prepare('SELECT COUNT(*) as n FROM sso_users').get().n,
-    reports: db.prepare('SELECT COUNT(*) as n FROM reports').get().n,
-    localAdmins: db.prepare('SELECT COUNT(*) as n FROM local_users').get().n,
+    tenants:      db.prepare('SELECT COUNT(*) as n FROM sso_tenants').get().n,
+    users:        db.prepare('SELECT COUNT(*) as n FROM sso_users').get().n,
+    reports:      db.prepare('SELECT COUNT(*) as n FROM reports').get().n,
+    localAdmins:  db.prepare('SELECT COUNT(*) as n FROM local_users').get().n,
+    twoFaEnabled: localAdmin ? !!localAdmin.totp_enabled : false,
+    mailOk:       mailTransport === 'graph' ? !!mailGraphId : !!mailHost,
+    mailLabel:    mailTransport === 'graph' ? 'Microsoft Graph' : (mailHost || null),
+    serverUrl:    getSetting(db, 'server_base_url', ''),
+    azureSync:    getSetting(db, 'azure_sync_schedule', 'off'),
   };
   res.render('admin/index', { title: 'Admin', path: '/admin', stats });
 });
@@ -301,7 +310,7 @@ async function _sendInvite(db, user, req) {
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   db.prepare('UPDATE local_users SET invite_token = ?, invite_expires = ? WHERE id = ?').run(token, expires, user.id);
 
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const baseUrl = getSetting(db, 'server_base_url', '').replace(/\/+$/, '') || `${req.protocol}://${req.get('host')}`;
   const inviteUrl = `${baseUrl}/auth/accept-invite?token=${token}`;
   const { sendEmail } = require('../emailSender');
   const transport = getSetting(db, 'mail_transport', 'smtp');
@@ -442,10 +451,11 @@ router.get('/settings', requireLocalAdmin, (req, res) => {
   };
 
   const azureSyncSchedule = getSetting(db, 'azure_sync_schedule', 'off');
+  const serverBaseUrl     = getSetting(db, 'server_base_url', '');
 
   const flash = req.session.flash || null;
   delete req.session.flash;
-  res.render('admin/settings', { title: 'Settings', path: '/admin', globalInterval, mail, tenants, timezones, storage, azureSyncSchedule, flash });
+  res.render('admin/settings', { title: 'Settings', path: '/admin', globalInterval, mail, tenants, timezones, storage, azureSyncSchedule, serverBaseUrl, flash });
 });
 
 function _buildTestEmailHtml(transport) {
@@ -555,6 +565,9 @@ router.post('/settings', requireLocalAdmin, (req, res) => {
 
   const azureSyncScheduleVal = ['off', 'daily', 'weekly'].includes(req.body.azure_sync_schedule) ? req.body.azure_sync_schedule : 'off';
   setSetting(db, 'azure_sync_schedule', azureSyncScheduleVal);
+
+  const rawUrl = (req.body.server_base_url || '').trim().replace(/\/+$/, '');
+  setSetting(db, 'server_base_url', rawUrl);
 
   startScheduler();
   req.session.flash = 'Settings saved.';

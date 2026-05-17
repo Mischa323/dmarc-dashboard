@@ -2,6 +2,7 @@
   <h4 class="mb-0 fw-bold">Admin Panel</h4>
 </div>
 
+<!-- Stat counters -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="card p-3 text-center">
@@ -12,7 +13,7 @@
   </div>
   <div class="col-6 col-md-3">
     <div class="card p-3 text-center">
-      <div class="text-secondary small mb-1">Users</div>
+      <div class="text-secondary small mb-1">SSO Users</div>
       <div class="fs-2 fw-bold"><%= stats.users %></div>
       <a href="/admin/users" class="stretched-link"></a>
     </div>
@@ -31,6 +32,87 @@
   </div>
 </div>
 
+<!-- System status -->
+<% if (locals.user && user.role === 'local_admin') { %>
+<h6 class="text-secondary small fw-semibold text-uppercase mb-3" style="letter-spacing:.05em;">
+  <i class="bi bi-activity me-2"></i>System status
+</h6>
+<div class="row g-3 mb-4">
+
+  <!-- Mail server -->
+  <div class="col-sm-6 col-lg-3">
+    <div class="card p-3 h-100 <%= stats.mailOk ? 'card-pass' : 'card-warn' %>">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <i class="bi bi-envelope fs-5" style="color:<%= stats.mailOk ? 'var(--clr-pass)' : 'var(--clr-warn)' %>;"></i>
+        <span class="small fw-semibold">Mail server</span>
+      </div>
+      <% if (stats.mailOk) { %>
+      <div class="small text-secondary mb-1">Configured</div>
+      <div class="small fw-semibold" style="color:var(--clr-pass);word-break:break-all;"><%= stats.mailLabel %></div>
+      <% } else { %>
+      <div class="small" style="color:var(--clr-warn);">Not configured</div>
+      <div class="small text-secondary mt-1">Invite emails and reports won't send.</div>
+      <% } %>
+      <a href="/admin/settings" class="stretched-link"></a>
+    </div>
+  </div>
+
+  <!-- Server URL -->
+  <div class="col-sm-6 col-lg-3">
+    <div class="card p-3 h-100 <%= stats.serverUrl ? 'card-pass' : 'card-warn' %>">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <i class="bi bi-globe2 fs-5" style="color:<%= stats.serverUrl ? 'var(--clr-pass)' : 'var(--clr-warn)' %>;"></i>
+        <span class="small fw-semibold">Server URL</span>
+      </div>
+      <% if (stats.serverUrl) { %>
+      <div class="small text-secondary mb-1">Configured</div>
+      <div class="small fw-semibold" style="color:var(--clr-pass);word-break:break-all;"><%= stats.serverUrl %></div>
+      <% } else { %>
+      <div class="small" style="color:var(--clr-warn);">Not configured</div>
+      <div class="small text-secondary mt-1">Invite links use the request host, which may break behind a proxy.</div>
+      <% } %>
+      <a href="/admin/settings" class="stretched-link"></a>
+    </div>
+  </div>
+
+  <!-- 2FA -->
+  <div class="col-sm-6 col-lg-3">
+    <div class="card p-3 h-100 <%= stats.twoFaEnabled ? 'card-pass' : 'card-warn' %>">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <i class="bi bi-shield-lock fs-5" style="color:<%= stats.twoFaEnabled ? 'var(--clr-pass)' : 'var(--clr-warn)' %>;"></i>
+        <span class="small fw-semibold">Two-factor auth</span>
+      </div>
+      <% if (stats.twoFaEnabled) { %>
+      <div class="small" style="color:var(--clr-pass);">Enabled on admin account</div>
+      <% } else { %>
+      <div class="small" style="color:var(--clr-warn);">Not enabled</div>
+      <div class="small text-secondary mt-1">Admin account has no TOTP second factor.</div>
+      <% } %>
+      <a href="/admin/2fa" class="stretched-link"></a>
+    </div>
+  </div>
+
+  <!-- Azure AD sync -->
+  <div class="col-sm-6 col-lg-3">
+    <div class="card p-3 h-100 <%= stats.azureSync !== 'off' ? 'card-pass' : '' %>">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <i class="bi bi-microsoft fs-5" style="color:<%= stats.azureSync !== 'off' ? 'var(--clr-pass)' : 'rgba(255,255,255,.35)' %>;"></i>
+        <span class="small fw-semibold">Azure AD sync</span>
+      </div>
+      <% if (stats.azureSync !== 'off') { %>
+      <div class="small" style="color:var(--clr-pass);">Auto-sync <%= stats.azureSync %></div>
+      <% } else { %>
+      <div class="small text-secondary">Disabled</div>
+      <div class="small text-secondary mt-1">Users must be imported manually.</div>
+      <% } %>
+      <a href="/admin/settings" class="stretched-link"></a>
+    </div>
+  </div>
+
+</div>
+<% } %>
+
+<!-- Quick links -->
 <div class="row g-3">
   <div class="col-md-4">
     <div class="card p-3 h-100">
@@ -41,12 +123,26 @@
   </div>
   <div class="col-md-4">
     <div class="card p-3 h-100">
-      <h6 class="fw-semibold mb-2"><i class="bi bi-people me-2 text-primary"></i>Users</h6>
-      <p class="text-secondary small mb-3">Manage local and SSO users. Assign <code>viewer</code> or <code>admin</code> roles.</p>
+      <h6 class="fw-semibold mb-2"><i class="bi bi-people me-2 text-primary"></i>Users &amp; Groups</h6>
+      <p class="text-secondary small mb-3">Manage local and SSO users. Assign <code>viewer</code> or <code>admin</code> roles and configure email report groups.</p>
       <a href="/admin/users" class="btn btn-sm btn-outline-primary">Manage users</a>
     </div>
   </div>
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <h6 class="fw-semibold mb-2"><i class="bi bi-journal-text me-2" style="color:var(--clr-accent);"></i>Activity Logs</h6>
+      <p class="text-secondary small mb-3">View scheduler events, email deliveries, user changes, and Azure AD sync results.</p>
+      <a href="/admin/logs" class="btn btn-sm btn-outline-secondary">View logs</a>
+    </div>
+  </div>
   <% if (locals.user && user.role === 'local_admin') { %>
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <h6 class="fw-semibold mb-2"><i class="bi bi-sliders me-2 text-secondary"></i>Settings</h6>
+      <p class="text-secondary small mb-3">Configure the fetch schedule, mail server, server URL, storage retention, and appearance.</p>
+      <a href="/admin/settings" class="btn btn-sm btn-outline-secondary">Open settings</a>
+    </div>
+  </div>
   <div class="col-md-4">
     <div class="card p-3 h-100">
       <h6 class="fw-semibold mb-2"><i class="bi bi-shield-lock me-2 text-warning"></i>Two-factor auth</h6>
