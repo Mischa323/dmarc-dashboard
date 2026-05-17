@@ -36,15 +36,33 @@
 
       <div class="mb-3">
         <label class="form-label">Display name <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" id="name" name="name" value="<%= tenant.name %>" placeholder="e.g. Contoso" required />
+        <div class="form-text">A friendly name shown in the dashboard and on the login page.</div>
+      </div>
+
+      <div class="mb-0">
+        <label class="form-label">Tenant color</label>
         <div class="d-flex gap-2 align-items-center">
-          <input type="text" class="form-control" id="name" name="name" value="<%= tenant.name %>" placeholder="e.g. Contoso" required />
-          <div>
-            <input type="color" name="color" value="<%= tenant.color || '#0a84ff' %>"
-                   title="Tenant color — used in charts and report list"
-                   style="width:44px;height:38px;border:1px solid rgba(255,255,255,.15);border-radius:10px;background:none;padding:2px;cursor:pointer;flex-shrink:0;" />
-          </div>
+          <input type="color" id="tenantColorPicker" name="color" value="<%= tenant.color || '#0a84ff' %>"
+                 style="width:36px;height:32px;border:1px solid rgba(255,255,255,.15);border-radius:8px;background:none;padding:2px;cursor:pointer;flex-shrink:0;"
+                 oninput="syncTenantHex(this)" />
+          <input type="text" id="tenantColorHex" class="form-control form-control-sm font-monospace"
+                 value="<%= tenant.color || '#0a84ff' %>" maxlength="7" placeholder="#0a84ff"
+                 oninput="syncTenantPicker(this)" style="max-width:110px;" />
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleTenantPresets()" title="Show presets">
+            <i class="bi bi-palette"></i>
+          </button>
+          <span class="text-secondary small">Identifies this tenant in charts and the report list.</span>
         </div>
-        <div class="form-text">A friendly name shown in the dashboard and on the login page. The colour identifies this tenant in charts.</div>
+        <% const TC_PRESETS = ['#0a84ff','#30d158','#bf5af2','#ff9f0a','#ff453a','#64d2ff','#ff375f','#ffd60a','#5e5ce6','#32ade6','#ac8e68','#98989d','#ff6b6b','#00c7be']; %>
+        <div id="tenantColorPresets" class="d-flex flex-wrap gap-1 mt-2" style="display:none!important;">
+          <% for (const hex of TC_PRESETS) { %>
+          <button type="button" title="<%= hex %>" onclick="setTenantColor('<%= hex %>')"
+                  style="width:24px;height:24px;background:<%= hex %>;border:2px solid rgba(255,255,255,0);border-radius:6px;padding:0;cursor:pointer;transition:border-color .12s;"
+                  onmouseover="this.style.borderColor='rgba(255,255,255,.7)'"
+                  onmouseout="this.style.borderColor='rgba(255,255,255,0)'"></button>
+          <% } %>
+        </div>
       </div>
 
       <div class="mb-3">
@@ -155,9 +173,29 @@
             </div>
             <div class="col-md-2">
               <label class="form-label small mb-1">Color</label>
-              <input type="color" class="form-control form-control-sm form-control-color w-100 color-input"
-                     name="domains[<%= i %>][color]"
-                     value="<%= tenant.domains[i].color || tenant.color || '#0a84ff' %>" />
+              <div class="d-flex gap-1 align-items-center mb-1">
+                <input type="color" class="color-input flex-shrink-0"
+                       name="domains[<%= i %>][color]"
+                       value="<%= tenant.domains[i].color || tenant.color || '#0a84ff' %>"
+                       style="width:30px;height:28px;border:1px solid rgba(255,255,255,.15);border-radius:6px;background:none;padding:2px;cursor:pointer;"
+                       oninput="syncDomainHex(this)" />
+                <button type="button" class="btn btn-sm btn-outline-secondary px-2 flex-shrink-0" onclick="toggleDomainPresets(this)" title="Presets">
+                  <i class="bi bi-palette" style="font-size:.8rem;"></i>
+                </button>
+              </div>
+              <input type="text" class="form-control form-control-sm font-monospace hex-input w-100"
+                     value="<%= tenant.domains[i].color || tenant.color || '#0a84ff' %>"
+                     maxlength="7" placeholder="#0a84ff"
+                     oninput="syncDomainPicker(this)" />
+              <% const DC_PRESETS = ['#0a84ff','#30d158','#bf5af2','#ff9f0a','#ff453a','#64d2ff','#ff375f','#ffd60a','#5e5ce6','#32ade6','#ac8e68','#98989d','#ff6b6b','#00c7be']; %>
+              <div class="color-presets-panel d-flex flex-wrap gap-1 mt-1" style="display:none!important;">
+                <% for (const hex of DC_PRESETS) { %>
+                <button type="button" title="<%= hex %>" onclick="setDomainColor(this,'<%= hex %>')"
+                        style="width:18px;height:18px;background:<%= hex %>;border:2px solid rgba(255,255,255,0);border-radius:4px;padding:0;cursor:pointer;transition:border-color .12s;"
+                        onmouseover="this.style.borderColor='rgba(255,255,255,.7)'"
+                        onmouseout="this.style.borderColor='rgba(255,255,255,0)'"></button>
+                <% } %>
+              </div>
             </div>
             <div class="col-md-2 d-flex align-items-end">
               <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="removeDomain(this)">
@@ -350,6 +388,58 @@
     document.getElementById('stepRedirectUri').textContent = this.value || 'https://your-host/auth/callback';
   });
 
+  // ── Color preset / sync helpers ─────────────────────────────────────────────
+  const COLOR_PRESETS = ['#0a84ff','#30d158','#bf5af2','#ff9f0a','#ff453a','#64d2ff','#ff375f','#ffd60a','#5e5ce6','#32ade6','#ac8e68','#98989d','#ff6b6b','#00c7be'];
+
+  function setTenantColor(hex) {
+    document.getElementById('tenantColorPicker').value = hex;
+    document.getElementById('tenantColorHex').value = hex;
+    document.getElementById('tenantColorPresets').style.setProperty('display', 'none', 'important');
+  }
+  function syncTenantHex(picker) {
+    document.getElementById('tenantColorHex').value = picker.value;
+  }
+  function syncTenantPicker(hexInput) {
+    if (/^#[0-9a-fA-F]{6}$/.test(hexInput.value.trim()))
+      document.getElementById('tenantColorPicker').value = hexInput.value.trim();
+  }
+  function toggleTenantPresets() {
+    const panel = document.getElementById('tenantColorPresets');
+    const hidden = panel.style.getPropertyValue('display') === 'none';
+    panel.style.setProperty('display', hidden ? 'flex' : 'none', 'important');
+    if (hidden) panel.style.flexWrap = 'wrap';
+  }
+
+  function setDomainColor(btn, hex) {
+    const row = btn.closest('.domain-row');
+    row.querySelector('.color-input').value = hex;
+    row.querySelector('.hex-input').value = hex;
+    const panel = row.querySelector('.color-presets-panel');
+    if (panel) panel.style.setProperty('display', 'none', 'important');
+  }
+  function syncDomainHex(picker) {
+    picker.closest('.domain-row').querySelector('.hex-input').value = picker.value;
+  }
+  function syncDomainPicker(hexInput) {
+    if (/^#[0-9a-fA-F]{6}$/.test(hexInput.value.trim()))
+      hexInput.closest('.domain-row').querySelector('.color-input').value = hexInput.value.trim();
+  }
+  function toggleDomainPresets(btn) {
+    const panel = btn.closest('.col-md-2').querySelector('.color-presets-panel');
+    const hidden = panel.style.getPropertyValue('display') === 'none';
+    panel.style.setProperty('display', hidden ? 'flex' : 'none', 'important');
+    if (hidden) panel.style.flexWrap = 'wrap';
+  }
+
+  function _presetSwatches() {
+    return COLOR_PRESETS.map(hex =>
+      `<button type="button" title="${hex}" onclick="setDomainColor(this,'${hex}')"
+               style="width:18px;height:18px;background:${hex};border:2px solid rgba(255,255,255,0);border-radius:4px;padding:0;cursor:pointer;transition:border-color .12s;"
+               onmouseover="this.style.borderColor='rgba(255,255,255,.7)'"
+               onmouseout="this.style.borderColor='rgba(255,255,255,0)'"></button>`
+    ).join('');
+  }
+
   // ── Multi-domain management ─────────────────────────────────────────────────
   let _domainIdx = <%= (tenant.domains || []).length %>;
 
@@ -375,8 +465,19 @@
           </div>
           <div class="col-md-2">
             <label class="form-label small mb-1">Color</label>
-            <input type="color" class="form-control form-control-sm form-control-color w-100 color-input"
-                   name="domains[${idx}][color]" value="${escAttr(color)}" />
+            <div class="d-flex gap-1 align-items-center mb-1">
+              <input type="color" class="color-input flex-shrink-0"
+                     name="domains[${idx}][color]" value="${escAttr(color)}"
+                     style="width:30px;height:28px;border:1px solid rgba(255,255,255,.15);border-radius:6px;background:none;padding:2px;cursor:pointer;"
+                     oninput="syncDomainHex(this)" />
+              <button type="button" class="btn btn-sm btn-outline-secondary px-2 flex-shrink-0" onclick="toggleDomainPresets(this)" title="Presets">
+                <i class="bi bi-palette" style="font-size:.8rem;"></i>
+              </button>
+            </div>
+            <input type="text" class="form-control form-control-sm font-monospace hex-input w-100"
+                   value="${escAttr(color)}" maxlength="7" placeholder="#0a84ff"
+                   oninput="syncDomainPicker(this)" />
+            <div class="color-presets-panel d-flex flex-wrap gap-1 mt-1" style="display:none!important;">${_presetSwatches()}</div>
           </div>
           <div class="col-md-2 d-flex align-items-end">
             <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="removeDomain(this)">
