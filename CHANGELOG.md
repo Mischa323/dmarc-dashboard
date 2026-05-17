@@ -90,6 +90,47 @@ _Changes on `master` not yet tagged._
 
 ---
 
+## [1.2.0] - 2026-05-17
+
+### Added
+
+**Security Groups**
+- Security groups replace standalone email-report groups — each group provides both access control (which tenants members can see) and email reporting (reports delivered to member email addresses)
+- Per-group role (`viewer` / `admin`) — effective role is computed at login from the highest-privilege group the user belongs to; the local admin account is always protected
+- Users can be assigned to groups (local accounts and SSO accounts separately)
+- Per-tenant access per group — controls which tenants' data is included in email reports
+- Email address field for local user accounts
+
+**Email reports**
+- Per-group email schedule: none, daily, weekly, monthly, or daily + weekly
+- Per-group send time and day (weekday for weekly, day-of-month 1–28 for monthly)
+- Global timezone setting (IANA) used to interpret all send times — searchable combobox in Settings
+- Monthly report option covering a 30-day window
+- Branded HTML email template matching the dashboard visual style (dark background, glass cards, coloured pass/fail indicators)
+- Styled test email sent when testing SMTP or Graph API connection
+
+**Dashboard & reports**
+- Warning banner on the Overview page when messages pass DMARC via SPF alignment only (no valid DKIM signature) — updates when the time-range picker changes
+- Warning notification on the report detail page for the same condition, showing the affected message count
+- Manual "Send daily / weekly / monthly" buttons in the Security Groups table
+
+**Storage management**
+- Storage card in Settings showing report count, record count, and database file size
+- Configurable report retention: 30 days / 60 days / 90 days / 180 days / 1 year / 2 years / keep forever
+- Manual "Purge old reports now" button
+- Automatic daily cleanup runs in the scheduler once per calendar day
+
+**UI**
+- Glass-style chart bars: low-alpha transparent fills with coloured border edges and rounded corners
+- Enhanced card glassmorphism: stronger backdrop blur, diagonal gradient background, top-edge and left-edge rim highlights
+- Monthly schedule badge in the Security Groups table
+
+### Fixed
+- SMTP / Graph API transport toggle in Settings called undefined JS functions — switching transport would throw an error
+- "Send monthly" button in Security Groups table sent daily reports instead of monthly
+
+---
+
 ## [1.1.0] - 2026-05-15
 
 ### Added
