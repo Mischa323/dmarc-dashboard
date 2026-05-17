@@ -1,0 +1,342 @@
+<div class="d-flex align-items-center mb-4 gap-3">
+  <div>
+    <h4 class="mb-0 fw-bold">SPF Record Generator</h4>
+    <p class="text-secondary small mb-0 mt-1">Build a valid SPF record by selecting who is allowed to send email for your domain.</p>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- ── Left: Builder ──────────────────────────────────────────────────── -->
+  <div class="col-lg-7">
+
+    <!-- Domain -->
+    <div class="card p-4 mb-3">
+      <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Your domain</h6>
+      <input type="text" id="inputDomain" class="form-control" placeholder="yourdomain.com"
+             oninput="rebuild()" />
+      <div class="form-text">Used for the DNS record name preview only — not part of the SPF value.</div>
+    </div>
+
+    <!-- Common senders -->
+    <div class="card p-4 mb-3">
+      <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Common senders</h6>
+      <p class="text-secondary small mb-3">Click to toggle. Each adds an <code>include:</code> to your record.</p>
+      <div class="d-flex flex-wrap gap-2" id="presetChips">
+        <% const presets = [
+          { label: 'Google Workspace',  icon: 'bi-google',       val: 'include:_spf.google.com' },
+          { label: 'Microsoft 365',     icon: 'bi-microsoft',    val: 'include:spf.protection.outlook.com' },
+          { label: 'SendGrid',          icon: 'bi-envelope-at',  val: 'include:sendgrid.net' },
+          { label: 'Mailchimp',         icon: 'bi-mailbox',      val: 'include:servers.mcsv.net' },
+          { label: 'Mailgun',           icon: 'bi-send',         val: 'include:mailgun.org' },
+          { label: 'Amazon SES',        icon: 'bi-cloud',        val: 'include:amazonses.com' },
+          { label: 'Postmark',          icon: 'bi-envelope-check', val: 'include:spf.mtasv.net' },
+          { label: 'Salesforce',        icon: 'bi-briefcase',    val: 'include:_spf.salesforce.com' },
+          { label: 'Zoho',              icon: 'bi-envelope',     val: 'include:zoho.com' },
+          { label: 'HubSpot',          icon: 'bi-megaphone',    val: 'include:hubspot.com' },
+          { label: 'Klaviyo',           icon: 'bi-graph-up',     val: 'include:klaviyo.com' },
+          { label: 'Brevo (Sendinblue)',icon: 'bi-lightning',    val: 'include:spf.sendinblue.com' },
+        ]; %>
+        <% for (const p of presets) { %>
+        <button type="button" class="btn btn-sm btn-outline-secondary preset-chip"
+                data-val="<%= p.val %>"
+                onclick="toggleChip(this)">
+          <i class="<%= p.icon %> me-1"></i><%= p.label %>
+        </button>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Custom includes -->
+    <div class="card p-4 mb-3">
+      <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Custom includes</h6>
+      <div id="includeList"></div>
+      <button type="button" class="btn btn-sm btn-outline-success mt-2" onclick="addInclude()">
+        <i class="bi bi-plus-lg me-1"></i>Add include
+      </button>
+    </div>
+
+    <!-- IP addresses -->
+    <div class="card p-4 mb-3">
+      <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Allowed IP addresses</h6>
+      <div id="ipList"></div>
+      <div class="d-flex gap-2 mt-2">
+        <button type="button" class="btn btn-sm btn-outline-success" onclick="addIp('ip4')">
+          <i class="bi bi-plus-lg me-1"></i>Add IPv4
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addIp('ip6')">
+          <i class="bi bi-plus-lg me-1"></i>Add IPv6
+        </button>
+      </div>
+    </div>
+
+    <!-- Mechanisms -->
+    <div class="card p-4 mb-3">
+      <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">DNS mechanisms</h6>
+      <div class="d-flex flex-column gap-2">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="mechMx" onchange="rebuild()">
+          <label class="form-check-label" for="mechMx">
+            <code class="me-1">mx</code>
+            <span class="text-secondary small">— allow servers listed in your domain's MX records</span>
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="mechA" onchange="rebuild()">
+          <label class="form-check-label" for="mechA">
+            <code class="me-1">a</code>
+            <span class="text-secondary small">— allow your domain's A/AAAA record IP</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Policy -->
+    <div class="card p-4 mb-3">
+      <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Policy for all other senders</h6>
+      <div class="d-flex flex-column gap-2">
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="spfAll" id="allSoftfail" value="~all" checked onchange="rebuild()">
+          <label class="form-check-label" for="allSoftfail">
+            <code class="me-1">~all</code>
+            <span class="text-secondary small">Softfail — mark as suspicious but still deliver
+              <span class="badge ms-1" style="background:rgba(255,159,10,.12);color:#ff9f0a;border:1px solid rgba(255,159,10,.22);font-size:.65rem;">recommended to start</span>
+            </span>
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="spfAll" id="allFail" value="-all" onchange="rebuild()">
+          <label class="form-check-label" for="allFail">
+            <code class="me-1">-all</code>
+            <span class="text-secondary small">Fail — reject all other senders
+              <span class="badge ms-1" style="background:rgba(48,209,88,.1);color:#30d158;border:1px solid rgba(48,209,88,.22);font-size:.65rem;">strictest</span>
+            </span>
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="spfAll" id="allNeutral" value="?all" onchange="rebuild()">
+          <label class="form-check-label" for="allNeutral">
+            <code class="me-1">?all</code>
+            <span class="text-secondary small">Neutral — no assertion about other senders</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Right: Live preview ────────────────────────────────────────────── -->
+  <div class="col-lg-5">
+    <div style="position:sticky;top:1rem;">
+
+      <!-- Record output -->
+      <div class="card p-4 mb-3">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h6 class="text-secondary mb-0 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Your SPF record</h6>
+          <button class="btn btn-sm btn-outline-secondary" onclick="copyRecord()">
+            <i class="bi bi-clipboard me-1"></i><span id="copyLabel">Copy</span>
+          </button>
+        </div>
+
+        <!-- DNS name row -->
+        <div class="mb-3">
+          <div class="text-secondary mb-1" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">DNS Name</div>
+          <div class="d-flex gap-2">
+            <input type="text" id="outName" class="form-control form-control-sm font-monospace"
+                   style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.85);"
+                   readonly value="@" />
+            <button class="btn btn-sm btn-outline-secondary flex-shrink-0" onclick="copyField('outName')"><i class="bi bi-clipboard"></i></button>
+          </div>
+        </div>
+
+        <!-- Type row -->
+        <div class="mb-3">
+          <div class="text-secondary mb-1" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Type</div>
+          <input type="text" class="form-control form-control-sm font-monospace"
+                 style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.85);"
+                 readonly value="TXT" />
+        </div>
+
+        <!-- Value row -->
+        <div class="mb-3">
+          <div class="text-secondary mb-1" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">Value</div>
+          <div class="d-flex gap-2 align-items-start">
+            <textarea id="outValue" class="form-control form-control-sm font-monospace"
+                      style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.85);resize:none;min-height:72px;"
+                      readonly></textarea>
+            <button class="btn btn-sm btn-outline-secondary flex-shrink-0" onclick="copyField('outValue')"><i class="bi bi-clipboard"></i></button>
+          </div>
+        </div>
+
+        <!-- Warnings -->
+        <div id="warnings"></div>
+      </div>
+
+      <!-- Mechanism breakdown -->
+      <div class="card p-4 mb-3">
+        <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Record breakdown</h6>
+        <div id="breakdown" class="d-flex flex-column gap-2"></div>
+      </div>
+
+      <!-- Tips -->
+      <div class="card p-4">
+        <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Tips</h6>
+        <ul class="small text-secondary mb-0 ps-3" style="line-height:1.85;">
+          <li>SPF is limited to <strong class="text-light">10 DNS lookups</strong> — each <code>include</code>, <code>a</code>, <code>mx</code> and <code>redirect</code> counts as one.</li>
+          <li>Add SPF before switching to <code>-all</code>; start with <code>~all</code> and monitor for a week.</li>
+          <li>Only one SPF record is allowed per domain — merging multiple into one TXT record is required.</li>
+          <li>SPF alone is not enough — use DMARC with <code>p=quarantine</code> or <code>p=reject</code> for full protection.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  const activeChips = new Set();
+
+  // ── Chip toggle ────────────────────────────────────────────────────────────
+  function toggleChip(btn) {
+    const val = btn.dataset.val;
+    if (activeChips.has(val)) {
+      activeChips.delete(val);
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-outline-secondary');
+    } else {
+      activeChips.add(val);
+      btn.classList.remove('btn-outline-secondary');
+      btn.classList.add('btn-primary');
+    }
+    rebuild();
+  }
+
+  // ── Dynamic rows ───────────────────────────────────────────────────────────
+  function addInclude() {
+    const row = document.createElement('div');
+    row.className = 'd-flex gap-2 mb-2 include-row';
+    row.innerHTML = `
+      <div class="input-group input-group-sm">
+        <span class="input-group-text" style="font-size:.8rem;">include:</span>
+        <input type="text" class="form-control form-control-sm" placeholder="mail.example.com" oninput="rebuild()" />
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" onclick="this.closest('.include-row').remove();rebuild()">
+        <i class="bi bi-trash3"></i>
+      </button>`;
+    document.getElementById('includeList').appendChild(row);
+  }
+
+  function addIp(type) {
+    const row = document.createElement('div');
+    row.className = 'd-flex gap-2 mb-2 ip-row';
+    row.dataset.type = type;
+    const ph = type === 'ip4' ? '203.0.113.1 or 203.0.113.0/24' : '2001:db8::1 or 2001:db8::/32';
+    row.innerHTML = `
+      <div class="input-group input-group-sm">
+        <span class="input-group-text" style="font-size:.8rem;">${type}:</span>
+        <input type="text" class="form-control form-control-sm" placeholder="${ph}" oninput="rebuild()" />
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" onclick="this.closest('.ip-row').remove();rebuild()">
+        <i class="bi bi-trash3"></i>
+      </button>`;
+    document.getElementById('ipList').appendChild(row);
+    rebuild();
+  }
+
+  // ── Build record ───────────────────────────────────────────────────────────
+  function rebuild() {
+    const domain = (document.getElementById('inputDomain').value || '').trim();
+    const policy = document.querySelector('input[name="spfAll"]:checked').value;
+
+    const parts = ['v=spf1'];
+    let lookups = 0;
+
+    if (document.getElementById('mechMx').checked)  { parts.push('mx');  lookups++; }
+    if (document.getElementById('mechA').checked)   { parts.push('a');   lookups++; }
+
+    for (const val of activeChips) {
+      parts.push(val);
+      lookups++;
+    }
+
+    for (const row of document.querySelectorAll('.include-row')) {
+      const v = row.querySelector('input').value.trim();
+      if (v) { parts.push('include:' + v); lookups++; }
+    }
+
+    for (const row of document.querySelectorAll('.ip-row')) {
+      const v = row.querySelector('input').value.trim();
+      if (v) parts.push(row.dataset.type + ':' + v);
+    }
+
+    parts.push(policy);
+
+    const record = parts.join(' ');
+
+    // Update outputs
+    document.getElementById('outName').value  = domain ? domain : '@';
+    document.getElementById('outValue').value = record;
+
+    // Warnings
+    const warnEl = document.getElementById('warnings');
+    const warns = [];
+    if (lookups > 10) warns.push({ type: 'danger', text: `Too many DNS lookups (${lookups}/10). Remove some includes or IPs to stay within the limit.` });
+    else if (lookups >= 8) warns.push({ type: 'warning', text: `Close to the 10-lookup limit (${lookups}/10). Be careful adding more includes.` });
+    if (record.length > 255) warns.push({ type: 'warning', text: `Record is ${record.length} chars. Values over 255 chars may need to be split (check with your DNS provider).` });
+    warnEl.innerHTML = warns.map(w => `
+      <div class="alert alert-${w.type} py-2 px-3 small mb-2">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>${escHtml(w.text)}
+      </div>`).join('');
+
+    // Breakdown
+    const breakdownEl = document.getElementById('breakdown');
+    breakdownEl.innerHTML = parts.map(p => {
+      let icon = 'bi-dot', color = 'rgba(255,255,255,.38)', label = '';
+      if (p === 'v=spf1')           { icon = 'bi-shield-check'; color = '#30d158'; label = 'SPF version'; }
+      else if (p === 'mx')          { icon = 'bi-envelope';     color = '#0a84ff'; label = 'Your MX servers (+1 lookup)'; }
+      else if (p === 'a')           { icon = 'bi-globe2';       color = '#0a84ff'; label = 'Your A record IP (+1 lookup)'; }
+      else if (p.startsWith('include:')) { icon = 'bi-box-arrow-in-right'; color = '#bf5af2'; label = 'Include: ' + p.slice(8) + ' (+1 lookup)'; }
+      else if (p.startsWith('ip4:'))     { icon = 'bi-hdd-network'; color = '#64d2ff'; label = 'IPv4 address: ' + p.slice(4); }
+      else if (p.startsWith('ip6:'))     { icon = 'bi-hdd-network'; color = '#64d2ff'; label = 'IPv6 address: ' + p.slice(4); }
+      else if (p === '~all')  { icon = 'bi-shield-exclamation'; color = '#ff9f0a'; label = 'Softfail — mark suspicious, still deliver'; }
+      else if (p === '-all')  { icon = 'bi-shield-x';           color = '#ff453a'; label = 'Fail — reject all other senders'; }
+      else if (p === '?all')  { icon = 'bi-shield';             color = 'rgba(255,255,255,.42)'; label = 'Neutral — no policy for other senders'; }
+      return `<div class="d-flex align-items-start gap-2">
+        <i class="bi ${icon} flex-shrink-0 mt-1" style="color:${color};font-size:.9rem;"></i>
+        <div>
+          <code class="small" style="color:${color};">${escHtml(p)}</code>
+          ${label ? `<span class="text-secondary small ms-2">${escHtml(label)}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Copy helpers ───────────────────────────────────────────────────────────
+  function copyRecord() {
+    const val = document.getElementById('outValue').value;
+    navigator.clipboard.writeText(val).then(() => {
+      const lbl = document.getElementById('copyLabel');
+      lbl.textContent = 'Copied!';
+      setTimeout(() => { lbl.textContent = 'Copy'; }, 2000);
+    });
+  }
+
+  function copyField(id) {
+    const el = document.getElementById(id);
+    const val = el.tagName === 'TEXTAREA' ? el.value : el.value;
+    navigator.clipboard.writeText(val).then(() => {
+      const btn = el.nextElementSibling;
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="bi bi-check"></i>';
+      setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Init
+  rebuild();
+</script>

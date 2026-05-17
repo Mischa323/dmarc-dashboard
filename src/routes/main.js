@@ -127,6 +127,10 @@ router.get('/reports/:id', (req, res) => {
   });
 });
 
+router.get('/tools/spf', (req, res) => {
+  res.render('tools/spf', { title: 'SPF Generator — DMARC', path: '/tools' });
+});
+
 router.post('/fetch', (req, res, next) => {
   const role = req.session.user && req.session.user.role;
   if (role === 'local_admin' || role === 'admin') return next();

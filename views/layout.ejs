@@ -207,6 +207,11 @@
           <li class="nav-item">
             <a class="nav-link <%= locals.path && locals.path.startsWith('/reports') ? 'active' : '' %>" href="/reports">Reports</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link <%= locals.path && locals.path.startsWith('/tools') ? 'active' : '' %>" href="/tools/spf">
+              <i class="bi bi-tools me-1"></i>Tools
+            </a>
+          </li>
           <% if (locals.user && (user.role === 'local_admin' || user.role === 'admin')) { %>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle <%= locals.path && locals.path.startsWith('/admin') ? 'active' : '' %>"
