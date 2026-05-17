@@ -20,8 +20,9 @@ router.get('/stats', (req, res) => {
 
   const isPass = r => r.dkim_aligned === 'pass' || r.spf_aligned === 'pass';
 
-  const total  = records.reduce((s, r) => s + r.count, 0);
-  const passed = records.filter(isPass).reduce((s, r) => s + r.count, 0);
+  const total       = records.reduce((s, r) => s + r.count, 0);
+  const passed      = records.filter(isPass).reduce((s, r) => s + r.count, 0);
+  const spfOnlyPass = records.filter(r => isPass(r) && r.dkim_aligned !== 'pass').reduce((s, r) => s + r.count, 0);
 
   // Aggregate daily trend + per-domain daily trend
   const daily       = {};
@@ -105,7 +106,8 @@ router.get('/stats', (req, res) => {
       pass_count: passed,
       fail_count: total - passed,
       pass_rate: total > 0 ? Math.round((passed / total) * 1000) / 10 : 0,
-      unique_ips: Object.keys(ipMap).length,
+      unique_ips:    Object.keys(ipMap).length,
+      spf_only_pass: spfOnlyPass,
     },
     daily_trend:     dailyTrend,
     domain_trends:   domainTrends,

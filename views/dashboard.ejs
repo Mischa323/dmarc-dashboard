@@ -9,6 +9,15 @@
   <small id="lastUpdated" class="text-secondary ms-auto"></small>
 </div>
 
+<!-- SPF-only pass warning -->
+<div id="spfOnlyWarning" class="d-flex gap-3 mb-4" style="display:none!important;background:rgba(255,159,10,.1);border:1px solid rgba(255,159,10,.35);border-radius:12px;padding:16px 20px;">
+  <div style="font-size:20px;line-height:1.3;">⚠</div>
+  <div>
+    <div class="fw-semibold mb-1" style="color:#ff9f0a;">DMARC passing via SPF only — no valid DKIM signatures found</div>
+    <div class="small text-secondary" id="spfOnlyWarningText"></div>
+  </div>
+</div>
+
 <!-- Summary cards -->
 <div class="row g-3 mb-4" id="summaryCards">
   <% for (let i = 0; i < 6; i++) { %>
@@ -106,10 +115,16 @@ function buildResultPie(s) {
     type: 'doughnut',
     data: {
       labels: ['Pass', 'Fail'],
-      datasets: [{ data: [s.pass_count, s.fail_count], backgroundColor: [cssClr('--clr-pass-rgb'), cssClr('--clr-fail-rgb')], borderWidth: 0 }]
+      datasets: [{
+        data: [s.pass_count, s.fail_count],
+        backgroundColor:      [cssClr('--clr-pass-rgb', .28), cssClr('--clr-fail-rgb', .28)],
+        borderColor:          [cssClr('--clr-pass-rgb', .75), cssClr('--clr-fail-rgb', .75)],
+        hoverBackgroundColor: [cssClr('--clr-pass-rgb', .45), cssClr('--clr-fail-rgb', .45)],
+        borderWidth: 1.5,
+      }]
     },
     options: {
-      plugins: { legend: { position: 'bottom' } },
+      plugins: { legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,.55)', boxWidth: 12, padding: 14 } } },
       cutout: '65%',
       onClick(evt, elements) {
         if (!elements.length) return;
@@ -127,6 +142,36 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+function glassBar(color, alpha = 0.22) {
+  return {
+    backgroundColor: hexToRgba(color, alpha),
+    borderColor:     hexToRgba(color, 0.75),
+    hoverBackgroundColor: hexToRgba(color, 0.38),
+    borderWidth: 1.5,
+    borderRadius: 4,
+    borderSkipped: false,
+  };
+}
+
+function glassCssBar(varName, alpha = 0.22) {
+  return {
+    backgroundColor: cssClr(varName, alpha),
+    borderColor:     cssClr(varName, 0.72),
+    hoverBackgroundColor: cssClr(varName, 0.38),
+    borderWidth: 1.5,
+    borderRadius: 4,
+    borderSkipped: false,
+  };
+}
+
+const glassScales = (stacked, horiz) => ({
+  ...(horiz
+    ? { x: { stacked, beginAtZero: true, grid: { color: 'rgba(255,255,255,.06)' }, ticks: { color: 'rgba(255,255,255,.38)', font: { size: 11 } } },
+        y: { stacked, grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: 'rgba(255,255,255,.45)', font: { size: 11 } } } }
+    : { x: { stacked, grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: 'rgba(255,255,255,.38)', font: { size: 11 } } },
+        y: { stacked, beginAtZero: true, grid: { color: 'rgba(255,255,255,.06)' }, ticks: { color: 'rgba(255,255,255,.38)', font: { size: 11 } } } })
+});
+
 function buildTrendLine(trend, domainTrends, domainColors) {
   destroyChart('trendLine');
   const domains = Object.keys(domainTrends || {});
@@ -139,16 +184,14 @@ function buildTrendLine(trend, domainTrends, domainColors) {
       return {
         label: domain,
         data: (domainTrends[domain] || []).map(d => d.pass + d.fail),
-        backgroundColor: hexToRgba(color, 0.6),
-        borderColor: hexToRgba(color, 0.9),
-        borderWidth: 1,
+        ...glassBar(color),
         stack: 'a',
       };
     });
   } else {
     datasets = [
-      { label: 'Pass', data: trend.map(d => d.pass), backgroundColor: cssClr('--clr-pass-rgb', .55), stack: 'a' },
-      { label: 'Fail', data: trend.map(d => d.fail), backgroundColor: cssClr('--clr-fail-rgb', .55), stack: 'a' },
+      { label: 'Pass', ...glassCssBar('--clr-pass-rgb'), stack: 'a', data: trend.map(d => d.pass) },
+      { label: 'Fail', ...glassCssBar('--clr-fail-rgb'), stack: 'a', data: trend.map(d => d.fail) },
     ];
   }
 
@@ -159,8 +202,8 @@ function buildTrendLine(trend, domainTrends, domainColors) {
     data: { labels: trendLabels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-      plugins: { legend: { position: 'top' } },
+      scales: glassScales(true, false),
+      plugins: { legend: { position: 'top', labels: { color: 'rgba(255,255,255,.55)', boxWidth: 12, padding: 14 } } },
       onClick(evt, elements) {
         if (!elements.length) return;
         const idx = elements[0].index;
@@ -183,9 +226,18 @@ function buildFailureDoughnut(f) {
     type: 'doughnut',
     data: {
       labels: ['DKIM + SPF fail', 'DKIM fail only', 'SPF fail only'],
-      datasets: [{ data: [f.dkim_and_spf, f.dkim_only, f.spf_only], backgroundColor: [cssClr('--clr-fail-rgb'), cssClr('--clr-warn-rgb'), cssClr('--clr-accent-rgb')], borderWidth: 0 }]
+      datasets: [{
+        data: [f.dkim_and_spf, f.dkim_only, f.spf_only],
+        backgroundColor: [cssClr('--clr-fail-rgb', .28), cssClr('--clr-warn-rgb', .28), cssClr('--clr-accent-rgb', .28)],
+        borderColor:     [cssClr('--clr-fail-rgb', .75), cssClr('--clr-warn-rgb', .75), cssClr('--clr-accent-rgb', .75)],
+        hoverBackgroundColor: [cssClr('--clr-fail-rgb', .45), cssClr('--clr-warn-rgb', .45), cssClr('--clr-accent-rgb', .45)],
+        borderWidth: 1.5,
+      }]
     },
-    options: { plugins: { legend: { position: 'bottom' } }, cutout: '60%' }
+    options: {
+      plugins: { legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,.55)', boxWidth: 12, padding: 14 } } },
+      cutout: '60%'
+    }
   });
 }
 
@@ -198,14 +250,14 @@ function buildIpBar(sources) {
     data: {
       labels: ipLabels,
       datasets: [
-        { label: 'Pass', data: top.map(s => s.pass), backgroundColor: cssClr('--clr-pass-rgb', .55), stack: 'a' },
-        { label: 'Fail', data: top.map(s => s.fail), backgroundColor: cssClr('--clr-fail-rgb', .55), stack: 'a' }
+        { label: 'Pass', data: top.map(s => s.pass), ...glassCssBar('--clr-pass-rgb'), stack: 'a' },
+        { label: 'Fail', data: top.map(s => s.fail), ...glassCssBar('--clr-fail-rgb'), stack: 'a' }
       ]
     },
     options: {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-      scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } },
-      plugins: { legend: { position: 'top' } },
+      scales: glassScales(true, true),
+      plugins: { legend: { position: 'top', labels: { color: 'rgba(255,255,255,.55)', boxWidth: 12, padding: 14 } } },
       onClick(evt, elements) {
         if (!elements.length) return;
         location.href = '/reports?ip=' + encodeURIComponent(ipLabels[elements[0].index]);
@@ -223,14 +275,14 @@ function buildOrgBar(orgs) {
     data: {
       labels: orgLabels,
       datasets: [
-        { label: 'Pass', data: orgs.map(o => o.pass), backgroundColor: cssClr('--clr-pass-rgb', .55), stack: 'a' },
-        { label: 'Fail', data: orgs.map(o => o.fail), backgroundColor: cssClr('--clr-fail-rgb', .55), stack: 'a' }
+        { label: 'Pass', data: orgs.map(o => o.pass), ...glassCssBar('--clr-pass-rgb'), stack: 'a' },
+        { label: 'Fail', data: orgs.map(o => o.fail), ...glassCssBar('--clr-fail-rgb'), stack: 'a' }
       ]
     },
     options: {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-      scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } },
-      plugins: { legend: { position: 'top' } },
+      scales: glassScales(true, true),
+      plugins: { legend: { position: 'top', labels: { color: 'rgba(255,255,255,.55)', boxWidth: 12, padding: 14 } } },
       onClick(evt, elements) {
         if (!elements.length) return;
         location.href = '/reports?org=' + encodeURIComponent(orgLabels[elements[0].index]);
@@ -250,6 +302,17 @@ async function loadStats(days) {
   buildIpBar(data.top_sources);
   buildOrgBar(data.top_orgs);
   document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+  const spfOnly = data.summary.spf_only_pass || 0;
+  const warn = document.getElementById('spfOnlyWarning');
+  if (spfOnly > 0) {
+    document.getElementById('spfOnlyWarningText').textContent =
+      `${spfOnly.toLocaleString()} message${spfOnly !== 1 ? 's' : ''} passed DMARC because SPF alignment succeeded, but DKIM alignment failed. ` +
+      `If SPF breaks (e.g. forwarded mail, cloud relay), these messages will fail DMARC entirely. Consider adding or fixing your DKIM configuration.`;
+    warn.style.cssText = '';
+  } else {
+    warn.style.cssText = 'display:none!important;';
+  }
 }
 
 loadStats(30);

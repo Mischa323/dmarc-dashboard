@@ -1,6 +1,6 @@
 {
   "name": "dmarc-dashboard",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "DMARC aggregate report dashboard",
   "main": "server.js",
   "scripts": {
@@ -20,6 +20,7 @@
     "fast-xml-parser": "^4.5.1",
     "node-cron": "^3.0.3",
     "node-fetch": "^2.7.0",
+    "nodemailer": "^8.0.7",
     "otplib": "^12.0.1",
     "qrcode": "^1.5.4",
     "selfsigned": "^2.4.1"

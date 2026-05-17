@@ -7,6 +7,18 @@ const { getAuthCodeUrl, exchangeCode, decodeState } = require('../msalHelper');
 
 const PENDING_TTL_MS = 5 * 60 * 1000; // 5 minutes for 2FA window
 
+function roleFromGroups(db, memberType, userId, fallback) {
+  if (fallback === 'local_admin') return 'local_admin';
+  const roles = db.prepare(`
+    SELECT g.role FROM email_report_groups g
+    JOIN group_members gm ON gm.group_id = g.id
+    WHERE gm.member_type = ? AND gm.member_id = ?
+  `).all(memberType, userId).map(r => r.role);
+  if (roles.includes('admin')) return 'admin';
+  if (roles.length > 0) return 'viewer';
+  return fallback || 'viewer';
+}
+
 const router = express.Router();
 
 // ── Login page ─────────────────────────────────────────────────────────────
@@ -55,7 +67,7 @@ router.post('/auth/local', async (req, res) => {
       if (err) return fail('Session error.');
       req.session.userId = user.id;
       req.session.userType = 'local';
-      req.session.user = { name: user.username, email: null, role: user.role || 'local_admin' };
+      req.session.user = { name: user.username, email: null, role: roleFromGroups(db, 'local', user.id, user.role || 'local_admin') };
       if (rememberMe) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
       const returnTo = req.session.returnTo || '/';
       delete req.session.returnTo;
@@ -159,7 +171,7 @@ router.get('/auth/callback', async (req, res) => {
       req.session.tenantDbId = tenant.id;
       req.session.accountId = account.homeAccountId;
       req.session.msalTokenCache = serializedCache;
-      req.session.user = { name: account.name || account.username, email: account.username, role: ssoUser.role };
+      req.session.user = { name: account.name || account.username, email: account.username, role: roleFromGroups(db, 'sso', ssoUser.id, ssoUser.role) };
       if (rememberMe) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
       const returnTo = req.session.returnTo || '/';
       delete req.session.returnTo;

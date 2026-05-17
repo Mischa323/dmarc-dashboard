@@ -1,0 +1,180 @@
+<div class="mb-4">
+  <a href="/admin/users" class="text-secondary text-decoration-none small">
+    <i class="bi bi-arrow-left me-1"></i>Back to Users &amp; Security Groups
+  </a>
+</div>
+
+<h4 class="fw-bold mb-4"><%= group.id ? 'Edit security group' : 'New security group' %></h4>
+
+<% if (error) { %>
+<div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-4">
+  <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i><span><%= error %></span>
+</div>
+<% } %>
+
+<form method="post" action="<%= group.id ? '/admin/email-reports/' + group.id : '/admin/email-reports' %>">
+  <div class="row g-4">
+    <div class="col-lg-7">
+
+      <!-- Name -->
+      <div class="card p-4 mb-3">
+        <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">Group</h6>
+        <div class="mb-3">
+          <label class="form-label">Name <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="name" value="<%= group.name %>"
+                 placeholder="e.g. Security team" required />
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Role</label>
+          <select class="form-select" name="role" style="max-width:220px;">
+            <option value="viewer" <%= group.role === 'viewer' || !group.role ? 'selected' : '' %>>viewer — read-only access</option>
+            <option value="admin"  <%= group.role === 'admin'  ? 'selected' : '' %>>admin — full access</option>
+          </select>
+          <div class="form-text">All users in this group receive this role.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Schedule</label>
+          <select class="form-select" name="schedule" style="max-width:220px;"
+                  onchange="toggleScheduleFields(this.value)">
+            <option value="none"    <%= group.schedule === 'none'    || !group.schedule ? 'selected' : '' %>>Disabled</option>
+            <option value="daily"   <%= group.schedule === 'daily'   ? 'selected' : '' %>>Daily</option>
+            <option value="weekly"  <%= group.schedule === 'weekly'  ? 'selected' : '' %>>Weekly</option>
+            <option value="monthly" <%= group.schedule === 'monthly' ? 'selected' : '' %>>Monthly</option>
+            <option value="both"    <%= group.schedule === 'both'    ? 'selected' : '' %>>Daily + Weekly</option>
+          </select>
+        </div>
+
+        <div id="scheduleFields" style="<%= !group.schedule || group.schedule === 'none' ? 'display:none;' : '' %>">
+          <div class="row g-3 mb-0">
+            <div class="col-md-4">
+              <label class="form-label">Send time</label>
+              <input type="time" class="form-control" name="send_time"
+                     value="<%= group.send_time || '08:00' %>" />
+              <div class="form-text">In the timezone configured in Settings.</div>
+            </div>
+            <div class="col-md-4" id="sendDayWrap"
+                 style="<%= (group.schedule === 'daily' || group.schedule === 'monthly' || !group.schedule || group.schedule === 'none') ? 'display:none;' : '' %>">
+              <label class="form-label">Weekly on</label>
+              <select class="form-select" name="send_day">
+                <% ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].forEach((d, i) => { %>
+                <option value="<%= i %>" <%= (group.send_day == i) ? 'selected' : '' %>><%= d %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4" id="sendMonthDayWrap"
+                 style="<%= group.schedule === 'monthly' ? '' : 'display:none;' %>">
+              <label class="form-label">Monthly on day</label>
+              <input type="number" class="form-control" name="send_month_day"
+                     min="1" max="28" value="<%= group.send_month_day || 1 %>" />
+              <div class="form-text">Day 1–28 to avoid month-end issues.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tenants -->
+      <div class="card p-4 mb-3">
+        <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">
+          <i class="bi bi-building me-1"></i>Tenant access
+        </h6>
+        <% if (tenants.length === 0) { %>
+        <p class="text-secondary small mb-0">No enabled tenants found. Add a tenant first.</p>
+        <% } else { %>
+        <p class="text-secondary small mb-3">Users in this group have access to reports from these tenants.</p>
+        <div class="d-flex flex-wrap gap-3">
+          <% for (const t of tenants) { %>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="tenant_ids" value="<%= t.id %>"
+                   id="tenant-<%= t.id %>"
+                   <%= (group.tenant_ids || []).includes(t.id) ? 'checked' : '' %> />
+            <label class="form-check-label small" for="tenant-<%= t.id %>"><%= t.name %></label>
+          </div>
+          <% } %>
+        </div>
+        <% } %>
+      </div>
+
+      <!-- Users -->
+      <div class="card p-4 mb-4">
+        <h6 class="text-secondary mb-3 small fw-semibold text-uppercase" style="letter-spacing:.05em;">
+          <i class="bi bi-people me-1"></i>Users
+        </h6>
+
+        <% const localMemberIds = (group.member_ids || []).filter(m => m.member_type === 'local').map(m => m.member_id); %>
+        <% const ssoMemberIds   = (group.member_ids || []).filter(m => m.member_type === 'sso').map(m => m.member_id); %>
+
+        <% if (localUsers.length > 0) { %>
+        <p class="text-secondary small mb-2">Local users</p>
+        <div class="d-flex flex-wrap gap-3 mb-3">
+          <% for (const u of localUsers) { %>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="member_local" value="<%= u.id %>"
+                   id="lu-<%= u.id %>"
+                   <%= localMemberIds.includes(u.id) ? 'checked' : '' %> />
+            <label class="form-check-label small" for="lu-<%= u.id %>">
+              <%= u.username %>
+              <% if (u.email) { %><span class="text-secondary">(<%= u.email %>)</span><% } else { %><span class="text-secondary fst-italic">no email</span><% } %>
+            </label>
+          </div>
+          <% } %>
+        </div>
+        <% } %>
+
+        <% if (ssoUsers.length > 0) { %>
+        <p class="text-secondary small mb-2">SSO users</p>
+        <div class="d-flex flex-wrap gap-3">
+          <% for (const u of ssoUsers) { %>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="member_sso" value="<%= u.id %>"
+                   id="su-<%= u.id %>"
+                   <%= ssoMemberIds.includes(u.id) ? 'checked' : '' %> />
+            <label class="form-check-label small" for="su-<%= u.id %>">
+              <%= u.display_name || u.email %>
+              <% if (u.display_name && u.email) { %><span class="text-secondary">(<%= u.email %>)</span><% } else if (!u.email) { %><span class="text-secondary fst-italic">no email</span><% } %>
+            </label>
+          </div>
+          <% } %>
+        </div>
+        <% } %>
+
+        <% if (localUsers.length === 0 && ssoUsers.length === 0) { %>
+        <p class="text-secondary small mb-0">No users found.</p>
+        <% } %>
+      </div>
+
+      <button type="submit" class="btn btn-success px-4">
+        <i class="bi bi-check-lg me-1"></i><%= group.id ? 'Save changes' : 'Create group' %>
+      </button>
+      <a href="/admin/users" class="btn btn-link text-secondary ms-2">Cancel</a>
+    </div>
+
+    <!-- Help sidebar -->
+    <div class="col-lg-5">
+      <div style="position:sticky;top:1rem;">
+        <div class="card p-4">
+          <h6 class="fw-semibold mb-3"><i class="bi bi-info-circle me-2 text-secondary"></i>How groups work</h6>
+          <ul class="small text-secondary mb-0 ps-3">
+            <li class="mb-2"><strong class="text-light">Tenant access</strong> — which tenants' reports are included in this group's emails</li>
+            <li class="mb-2"><strong class="text-light">Users</strong> — reports are sent to users' email addresses; users without an email address are skipped</li>
+            <li><strong class="text-light">Email notifications</strong> — when on, the global schedule sends reports to this group</li>
+          </ul>
+          <hr style="border-color:rgba(255,255,255,.07);" />
+          <p class="small text-secondary mb-0">
+            Mail server and time zone are configured in
+            <a href="/admin/settings" class="text-secondary">Settings</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script>
+  function toggleScheduleFields(val) {
+    document.getElementById('scheduleFields').style.display    = val === 'none' ? 'none' : '';
+    document.getElementById('sendDayWrap').style.display       = (val === 'daily' || val === 'monthly') ? 'none' : '';
+    document.getElementById('sendMonthDayWrap').style.display  = val === 'monthly' ? '' : 'none';
+  }
+</script>

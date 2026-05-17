@@ -33,6 +33,176 @@
       </div>
     </div>
 
+    <!-- Mail server -->
+    <div class="col-12">
+      <div class="card p-4">
+        <h6 class="text-secondary small fw-semibold text-uppercase mb-3" style="letter-spacing:.05em;">
+          <i class="bi bi-envelope me-2"></i>Mail server
+        </h6>
+        <p class="text-secondary small mb-3">
+          One outgoing mail server is used for all email reports.
+        </p>
+
+        <!-- Transport -->
+        <div class="mb-3">
+          <label class="form-label">Send via</label>
+          <select class="form-select" name="mail_transport" id="mailTransport"
+                  onchange="toggleMailTransport(this.value)" style="max-width:320px;">
+            <option value="smtp"  <%= mail.transport === 'smtp'  ? 'selected' : '' %>>SMTP</option>
+            <option value="graph" <%= mail.transport === 'graph' ? 'selected' : '' %>>Microsoft Graph (send from tenant mailbox)</option>
+          </select>
+        </div>
+
+        <!-- SMTP fields -->
+        <div id="smtpFields" style="<%= mail.transport === 'graph' ? 'display:none;' : '' %>">
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">SMTP host</label>
+              <input type="text" class="form-control font-monospace" name="mail_smtp_host"
+                     value="<%= mail.smtp_host %>" placeholder="smtp.office365.com" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Port</label>
+              <input type="number" class="form-control" name="mail_smtp_port"
+                     value="<%= mail.smtp_port || 587 %>" min="1" max="65535" />
+            </div>
+            <div class="col-md-3 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="mailSmtpSecure"
+                       name="mail_smtp_secure" value="1"
+                       <%= mail.smtp_secure === '1' ? 'checked' : '' %> />
+                <label class="form-check-label small" for="mailSmtpSecure">TLS (port 465)</label>
+              </div>
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label">Username</label>
+              <input type="text" class="form-control" name="mail_smtp_user"
+                     value="<%= mail.smtp_user %>" placeholder="Optional" autocomplete="off" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Password</label>
+              <input type="password" class="form-control" name="mail_smtp_pass"
+                     placeholder="Leave blank to keep existing" autocomplete="new-password" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">From address</label>
+              <input type="email" class="form-control" name="mail_smtp_from"
+                     value="<%= mail.smtp_from %>" placeholder="dmarc@yourdomain.com" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Graph fields -->
+        <div id="graphFields" style="<%= mail.transport !== 'graph' ? 'display:none;' : '' %>">
+          <div class="mb-3">
+            <label class="form-label">Tenant</label>
+            <% if (tenants.length === 0) { %>
+            <p class="text-secondary small">No enabled tenants. Add a tenant first.</p>
+            <% } else { %>
+            <select class="form-select" name="mail_graph_tenant_id" style="max-width:320px;">
+              <option value="">— select tenant —</option>
+              <% for (const t of tenants) { %>
+              <option value="<%= t.id %>" <%= mail.graph_tenant_id == t.id ? 'selected' : '' %>><%= t.name %></option>
+              <% } %>
+            </select>
+            <div class="form-text">Emails are sent from that tenant's configured mailbox. Requires <code>Mail.Send</code> Application permission in Azure.</div>
+            <% } %>
+          </div>
+        </div>
+
+        <!-- Test connection -->
+        <hr style="border-color:rgba(255,255,255,.07);" />
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <input type="text" id="mailTestTo" placeholder="Send test to (email address)"
+                 class="form-control" style="max-width:260px;" />
+          <button type="button" class="btn btn-outline-secondary" onclick="testMailConfig()">
+            <i class="bi bi-send me-1"></i>Send test email
+          </button>
+        </div>
+        <div id="mailTestResult" class="mt-2" style="display:none;"></div>
+
+      </div>
+    </div>
+
+    <!-- Timezone -->
+    <div class="col-12">
+      <div class="card p-4">
+        <h6 class="text-secondary small fw-semibold text-uppercase mb-3" style="letter-spacing:.05em;">
+          <i class="bi bi-globe me-2"></i>Time zone
+        </h6>
+        <p class="text-secondary small mb-3">Used to interpret send times configured on security groups.</p>
+        <div class="tz-picker" style="max-width:320px;position:relative;">
+          <input type="text" id="tzInput" class="form-control" autocomplete="off"
+                 placeholder="Search time zones…"
+                 value="<%= mail.timezone || 'UTC' %>" />
+          <input type="hidden" name="mail_timezone" id="tzHidden" value="<%= mail.timezone || 'UTC' %>" />
+          <div id="tzDropdown">
+            <% for (const tz of timezones) { %>
+            <div class="tz-opt" data-value="<%= tz %>"><%= tz %></div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Storage -->
+    <div class="col-12">
+      <div class="card p-4">
+        <h6 class="text-secondary small fw-semibold text-uppercase mb-3" style="letter-spacing:.05em;">
+          <i class="bi bi-database me-2"></i>Storage
+        </h6>
+
+        <!-- Stats row -->
+        <div class="row g-3 mb-4">
+          <div class="col-4">
+            <div class="card p-3 text-center">
+              <div class="text-secondary small mb-1">Reports</div>
+              <div class="fs-4 fw-bold"><%= storage.reports.toLocaleString() %></div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="card p-3 text-center">
+              <div class="text-secondary small mb-1">Records</div>
+              <div class="fs-4 fw-bold"><%= storage.records.toLocaleString() %></div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="card p-3 text-center">
+              <div class="text-secondary small mb-1">Database size</div>
+              <div class="fs-4 fw-bold"><%=
+                storage.dbSizeBytes >= 1073741824 ? (storage.dbSizeBytes / 1073741824).toFixed(1) + ' GB' :
+                storage.dbSizeBytes >= 1048576    ? (storage.dbSizeBytes / 1048576).toFixed(1) + ' MB' :
+                (storage.dbSizeBytes / 1024).toFixed(0) + ' KB'
+              %></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Retention -->
+        <label class="form-label">Report retention</label>
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <select class="form-select" name="report_retention_days" style="max-width:220px;">
+            <option value="0"   <%= storage.retentionDays === 0   ? 'selected' : '' %>>Keep forever</option>
+            <option value="30"  <%= storage.retentionDays === 30  ? 'selected' : '' %>>30 days</option>
+            <option value="60"  <%= storage.retentionDays === 60  ? 'selected' : '' %>>60 days</option>
+            <option value="90"  <%= storage.retentionDays === 90  ? 'selected' : '' %>>90 days</option>
+            <option value="180" <%= storage.retentionDays === 180 ? 'selected' : '' %>>180 days</option>
+            <option value="365" <%= storage.retentionDays === 365 ? 'selected' : '' %>>1 year</option>
+            <option value="730" <%= storage.retentionDays === 730 ? 'selected' : '' %>>2 years</option>
+          </select>
+          <% if (storage.retentionDays > 0) { %>
+          <button type="button" class="btn btn-outline-danger btn-sm" onclick="purgeNow()">
+            <i class="bi bi-trash me-1"></i>Purge old reports now
+          </button>
+          <div id="purgeResult" class="small" style="display:none;"></div>
+          <% } %>
+        </div>
+        <div class="form-text mt-1">Reports older than the selected period are automatically deleted once per day. Set to "Keep forever" to disable.</div>
+      </div>
+    </div>
+
     <!-- Appearance -->
     <div class="col-12">
       <div class="card p-4">
@@ -118,6 +288,20 @@
 </form>
 
 <style>
+  #tzDropdown {
+    display: none; position: fixed; z-index: 9999;
+    background: #111827; border: 1px solid rgba(255,255,255,.12); border-radius: 10px;
+    max-height: 220px; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  }
+  .tz-opt {
+    padding: 7px 12px; font-size: .875rem; cursor: pointer; color: rgba(255,255,255,.8);
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  .tz-opt:last-child { border-bottom: none; }
+  .tz-opt:hover, .tz-opt.tz-active {
+    background: rgba(255,255,255,.08); color: #fff;
+  }
+
   .settings-swatch {
     width: 80px; height: 56px; border-radius: 14px;
     border: 2px solid transparent; cursor: pointer;
@@ -144,6 +328,130 @@
 </style>
 
 <script>
+  async function testMailConfig() {
+    const btn = event.currentTarget;
+    const result = document.getElementById('mailTestResult');
+    const testTo = document.getElementById('mailTestTo').value.trim();
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending…';
+    result.style.display = 'none';
+
+    const form = document.querySelector('form');
+    const data = new FormData(form);
+    data.set('test_to', testTo);
+    // include unchecked checkbox explicitly as '0'
+    if (!data.get('mail_smtp_secure')) data.set('mail_smtp_secure', '0');
+
+    try {
+      const r = await fetch('/admin/settings/test-mail', {
+        method: 'POST',
+        body: new URLSearchParams(data),
+      });
+      const json = await r.json();
+      result.style.display = '';
+      if (json.ok) {
+        result.className = 'mt-2 p-2 rounded small';
+        result.style.cssText = 'display:block;background:rgba(48,209,88,.08);border:1px solid rgba(48,209,88,.2);border-radius:10px;padding:.5rem .75rem;';
+        result.innerHTML = '<i class="bi bi-check-circle-fill me-2" style="color:#30d158;"></i><span style="color:#30d158;">' + json.message + '</span>';
+      } else {
+        result.style.cssText = 'display:block;background:rgba(255,69,58,.08);border:1px solid rgba(255,69,58,.2);border-radius:10px;padding:.5rem .75rem;';
+        result.innerHTML = '<i class="bi bi-x-circle-fill me-2" style="color:#ff453a;"></i><span style="color:#ff453a;">' + json.error + '</span>';
+      }
+    } catch (e) {
+      result.style.cssText = 'display:block;background:rgba(255,69,58,.08);border:1px solid rgba(255,69,58,.2);border-radius:10px;padding:.5rem .75rem;';
+      result.innerHTML = '<i class="bi bi-x-circle-fill me-2" style="color:#ff453a;"></i><span style="color:#ff453a;">' + e.message + '</span>';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-send me-1"></i>Send test email';
+    }
+  }
+
+  async function purgeNow() {
+    const btn = event.currentTarget;
+    const result = document.getElementById('purgeResult');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Purging…';
+    result.style.display = 'none';
+    try {
+      const r = await fetch('/admin/settings/purge', { method: 'POST' });
+      const d = await r.json();
+      result.style.display = '';
+      if (d.ok) {
+        result.style.color = 'var(--clr-pass)';
+        result.textContent = d.deleted > 0 ? `Deleted ${d.deleted} report(s).` : 'Nothing to purge — all reports are within the retention period.';
+      } else {
+        result.style.color = 'var(--clr-fail)';
+        result.textContent = d.error;
+      }
+    } catch {
+      result.style.display = '';
+      result.style.color = 'var(--clr-fail)';
+      result.textContent = 'Request failed.';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-trash me-1"></i>Purge old reports now';
+  }
+
+  function toggleMailTransport(val) {
+    document.getElementById('smtpFields').style.display  = val === 'graph' ? 'none' : '';
+    document.getElementById('graphFields').style.display = val === 'graph' ? '' : 'none';
+  }
+
+  (function () {
+    const inp  = document.getElementById('tzInput');
+    const hid  = document.getElementById('tzHidden');
+    const drop = document.getElementById('tzDropdown');
+    const opts = Array.from(drop.querySelectorAll('.tz-opt'));
+
+    // Move dropdown to body so it escapes card stacking context
+    document.body.appendChild(drop);
+
+    function reposition() {
+      const r = inp.getBoundingClientRect();
+      drop.style.left   = r.left + 'px';
+      drop.style.top    = (r.bottom + 4) + 'px';
+      drop.style.width  = r.width + 'px';
+    }
+
+    function show() { reposition(); drop.style.display = 'block'; filter(inp.value); }
+    function hide() { drop.style.display = 'none'; }
+
+    function filter(q) {
+      const lower = q.toLowerCase();
+      let first = null;
+      opts.forEach(o => {
+        const match = o.dataset.value.toLowerCase().includes(lower);
+        o.style.display = match ? '' : 'none';
+        if (match && !first) first = o;
+      });
+      opts.forEach(o => o.classList.remove('tz-active'));
+      if (first) first.classList.add('tz-active');
+    }
+
+    function select(val) {
+      inp.value = val;
+      hid.value = val;
+      hide();
+    }
+
+    inp.addEventListener('focus', show);
+    inp.addEventListener('input', () => show());
+    inp.addEventListener('blur',  () => setTimeout(hide, 150));
+    inp.addEventListener('keydown', e => {
+      const visible = opts.filter(o => o.style.display !== 'none');
+      const cur = visible.findIndex(o => o.classList.contains('tz-active'));
+      if (e.key === 'ArrowDown') { e.preventDefault(); const next = visible[cur + 1] || visible[0]; if (next) { opts.forEach(o => o.classList.remove('tz-active')); next.classList.add('tz-active'); next.scrollIntoView({ block: 'nearest' }); } }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); const prev = visible[cur - 1] || visible[visible.length - 1]; if (prev) { opts.forEach(o => o.classList.remove('tz-active')); prev.classList.add('tz-active'); prev.scrollIntoView({ block: 'nearest' }); } }
+      if (e.key === 'Enter')     { e.preventDefault(); const act = visible.find(o => o.classList.contains('tz-active')); if (act) select(act.dataset.value); }
+      if (e.key === 'Escape')    { hide(); }
+    });
+
+    opts.forEach(o => o.addEventListener('mousedown', e => { e.preventDefault(); select(o.dataset.value); }));
+    window.addEventListener('scroll', () => { if (drop.style.display !== 'none') reposition(); }, true);
+    window.addEventListener('resize', () => { if (drop.style.display !== 'none') reposition(); });
+  })();
+
   (function () {
     const active = localStorage.getItem('dmarc-active-theme');
     document.querySelectorAll('.settings-swatch').forEach(s =>
