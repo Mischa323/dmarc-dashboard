@@ -10,13 +10,22 @@ router.get('/stats', (req, res) => {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const db = getDb();
 
-  const records = db.prepare(`
-    SELECT rec.*, rep.end_date, rep.org_name, rep.domain, t.color AS tenant_color
-    FROM records rec
-    JOIN reports rep ON rec.report_id = rep.id
-    LEFT JOIN sso_tenants t ON rep.tenant_db_id = t.id
-    WHERE rep.end_date >= ?
-  `).all(since);
+  const isSso = req.session.userType === 'sso';
+  const records = isSso
+    ? db.prepare(`
+        SELECT rec.*, rep.end_date, rep.org_name, rep.domain, t.color AS tenant_color
+        FROM records rec
+        JOIN reports rep ON rec.report_id = rep.id
+        LEFT JOIN sso_tenants t ON rep.tenant_db_id = t.id
+        WHERE rep.end_date >= ? AND rep.tenant_db_id = ?
+      `).all(since, req.session.tenantDbId)
+    : db.prepare(`
+        SELECT rec.*, rep.end_date, rep.org_name, rep.domain, t.color AS tenant_color
+        FROM records rec
+        JOIN reports rep ON rec.report_id = rep.id
+        LEFT JOIN sso_tenants t ON rep.tenant_db_id = t.id
+        WHERE rep.end_date >= ?
+      `).all(since);
 
   const isPass = r => r.dkim_aligned === 'pass' || r.spf_aligned === 'pass';
 
@@ -97,7 +106,9 @@ router.get('/stats', (req, res) => {
     .sort((a, b) => b.total - a.total)
     .slice(0, 10);
 
-  const totalReports = db.prepare('SELECT COUNT(*) as cnt FROM reports WHERE end_date >= ?').get(since).cnt;
+  const totalReports = isSso
+    ? db.prepare('SELECT COUNT(*) as cnt FROM reports WHERE end_date >= ? AND tenant_db_id = ?').get(since, req.session.tenantDbId).cnt
+    : db.prepare('SELECT COUNT(*) as cnt FROM reports WHERE end_date >= ?').get(since).cnt;
 
   res.json({
     summary: {

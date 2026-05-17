@@ -136,11 +136,16 @@ router.get('/auth/sso/:tenantDbId', async (req, res) => {
 
 router.get('/auth/callback', async (req, res) => {
   const { code, state, error, error_description } = req.query;
-  if (error) return res.status(400).send(`Microsoft error: ${error_description || error}`);
+  if (error) return res.status(400).type('text/plain').send(`Microsoft error: ${error_description || error}`);
   if (!code || !state) return res.status(400).send('Invalid callback.');
 
   const stateData = decodeState(state);
   if (!stateData) return res.status(400).send('Invalid state parameter.');
+
+  if (!stateData.nonce || stateData.nonce !== req.session.oauthNonce) {
+    return res.status(400).send('Invalid OAuth state.');
+  }
+  delete req.session.oauthNonce;
 
   try {
     const db = getDb();

@@ -92,7 +92,7 @@
               </button>
               <% if (t.domains && t.domains.length > 0) { %>
               <button class="btn btn-sm btn-outline-secondary" type="button"
-                      data-domains="<%- JSON.stringify(t.domains).replace(/"/g, '&quot;') %>"
+                      data-domains="<%= encodeURIComponent(JSON.stringify(t.domains)) %>"
                       data-mailbox="<%= t.mailbox %>"
                       onclick="showRecordsFromBtn(this)">
                 <i class="bi bi-file-text me-1"></i>Records
@@ -210,7 +210,7 @@
   }
 
   function showRecordsFromBtn(btn) {
-    showRecords(JSON.parse(btn.dataset.domains), btn.dataset.mailbox);
+    showRecords(JSON.parse(decodeURIComponent(btn.dataset.domains)), btn.dataset.mailbox);
   }
 
   function recordRow(label, name, value) {

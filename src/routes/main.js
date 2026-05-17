@@ -32,6 +32,7 @@ router.get('/reports', (req, res) => {
   const conditions = [];
   const params     = [];
 
+  if (req.session.userType === 'sso') { conditions.push('tenant_db_id = ?'); params.push(req.session.tenantDbId); }
   if (domain) { conditions.push('domain LIKE ?');         params.push(`%${domain}%`); }
   if (org)    { conditions.push('org_name = ?');           params.push(org); }
   if (date)   { conditions.push("DATE(end_date) = ?");     params.push(date); }
@@ -49,7 +50,9 @@ router.get('/reports', (req, res) => {
 
   const total   = db.prepare(`SELECT COUNT(*) as cnt FROM reports ${where}`).get(...params).cnt;
   const reports = db.prepare(`SELECT * FROM reports ${where} ORDER BY end_date DESC LIMIT ? OFFSET ?`).all(...params, perPage, offset);
-  const domains = db.prepare('SELECT DISTINCT domain FROM reports ORDER BY domain').all().map(r => r.domain);
+  const domains = req.session.userType === 'sso'
+    ? db.prepare('SELECT DISTINCT domain FROM reports WHERE tenant_db_id = ? ORDER BY domain').all(req.session.tenantDbId).map(r => r.domain)
+    : db.prepare('SELECT DISTINCT domain FROM reports ORDER BY domain').all().map(r => r.domain);
 
   let enriched = [];
   if (reports.length > 0) {
@@ -103,7 +106,9 @@ router.get('/reports', (req, res) => {
 
 router.get('/reports/:id', (req, res) => {
   const db     = getDb();
-  const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  const report = req.session.userType === 'sso'
+    ? db.prepare('SELECT * FROM reports WHERE id = ? AND tenant_db_id = ?').get(req.params.id, req.session.tenantDbId)
+    : db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
   if (!report) return res.status(404).render('error', { layout: 'layout', title: 'Not Found', message: 'Report not found.' });
 
   const records = db.prepare('SELECT * FROM records WHERE report_id = ? ORDER BY count DESC').all(report.id);
