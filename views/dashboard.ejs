@@ -124,6 +124,7 @@ function buildResultPie(s) {
       }]
     },
     options: {
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,.55)', boxWidth: 12, padding: 14 } } },
       cutout: '65%',
       onClick(evt, elements) {
@@ -265,6 +266,7 @@ function buildFailureDoughnut(f) {
       }]
     },
     options: {
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,.55)', boxWidth: 12, padding: 14 } } },
       cutout: '60%'
     }

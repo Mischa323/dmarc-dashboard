@@ -77,28 +77,34 @@
 
 <!-- Record table -->
 <div class="card">
-  <div class="px-3 pt-3 pb-2">
+  <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between">
     <h6 class="text-secondary mb-0">Records (<%= report.records.length %>)</h6>
+    <span class="small text-secondary">Click a row to expand details</span>
   </div>
   <div class="table-responsive">
-    <table class="table table-hover table-sm mb-0 align-middle">
+    <table class="table table-sm mb-0 align-middle" id="recordsTable">
       <thead>
         <tr>
-          <th>Source IP</th>
+          <th style="width:1.5rem;"></th>
+          <th>Sending server</th>
+          <th>Sending domain</th>
           <th class="text-end">Count</th>
           <th>DMARC</th>
           <th>Disposition</th>
-          <th>DKIM aligned</th>
-          <th>SPF aligned</th>
-          <th>DKIM auth (domain)</th>
-          <th>SPF auth (domain)</th>
           <th>Failure reason</th>
         </tr>
       </thead>
       <tbody>
-        <% for (const rec of report.records) { %>
-        <tr>
+        <% for (let i = 0; i < report.records.length; i++) {
+             const rec = report.records[i];
+             const sendDomain = rec.envelope_from || rec.spf_domain || '—';
+        %>
+        <tr class="record-row" onclick="toggleDetail(<%= i %>)" style="cursor:pointer;">
+          <td class="text-secondary" style="font-size:.7rem;">
+            <i class="bi bi-chevron-right expand-icon" id="icon-<%= i %>" style="transition:transform .15s;"></i>
+          </td>
           <td><code class="small"><%= rec.source_ip || '—' %></code></td>
+          <td class="small text-secondary"><%= sendDomain %></td>
           <td class="text-end"><%= rec.count %></td>
           <td>
             <% if (rec.dmarc_pass) { %>
@@ -107,24 +113,14 @@
             <span class="badge badge-fail px-2 py-1">FAIL</span>
             <% } %>
           </td>
-          <td><code class="small text-secondary"><%= rec.disposition %></code></td>
           <td>
-            <span class="small <%= rec.dkim_aligned === 'pass' ? 'pass-color' : 'fail-color' %>">
-              <%= rec.dkim_aligned || '—' %>
-            </span>
-          </td>
-          <td>
-            <span class="small <%= rec.spf_aligned === 'pass' ? 'pass-color' : 'fail-color' %>">
-              <%= rec.spf_aligned || '—' %>
-            </span>
-          </td>
-          <td class="small text-secondary">
-            <%= rec.dkim_auth_result || '—' %>
-            <% if (rec.dkim_domain) { %><span class="text-muted">(<%= rec.dkim_domain %>)</span><% } %>
-          </td>
-          <td class="small text-secondary">
-            <%= rec.spf_auth_result || '—' %>
-            <% if (rec.spf_domain) { %><span class="text-muted">(<%= rec.spf_domain %>)</span><% } %>
+            <% if (rec.disposition === 'quarantine') { %>
+            <span class="small" style="color:var(--clr-warn);">quarantine</span>
+            <% } else if (rec.disposition === 'reject') { %>
+            <span class="small fail-color">reject</span>
+            <% } else { %>
+            <code class="small text-secondary"><%= rec.disposition || '—' %></code>
+            <% } %>
           </td>
           <td class="small <%= !rec.dmarc_pass ? 'fail-color' : 'text-secondary' %>">
             <% if (rec.failure_reason === 'dkim_and_spf') { %>Both DKIM &amp; SPF failed
@@ -133,8 +129,213 @@
             <% } else { %>—<% } %>
           </td>
         </tr>
+        <!-- Expand detail row -->
+        <tr id="detail-<%= i %>" style="display:none;">
+          <td colspan="7" style="padding:0;border-top:none;">
+            <div class="detail-panel px-4 py-3">
+
+              <!-- Three-column detail grid -->
+              <div class="row g-3 mb-3">
+
+                <!-- Sending server -->
+                <div class="col-md-4">
+                  <div class="detail-card">
+                    <div class="detail-card-title"><i class="bi bi-server me-2"></i>Sending server</div>
+                    <div class="detail-row"><span>IP address</span><code><%= rec.source_ip || '—' %></code></div>
+                    <div class="detail-row"><span>Claimed domain</span><code><%= sendDomain %></code></div>
+                    <% if (rec.header_from && rec.header_from !== sendDomain) { %>
+                    <div class="detail-row"><span>Header From</span><code><%= rec.header_from %></code></div>
+                    <% } %>
+                    <div class="detail-row"><span>Disposition</span>
+                      <% if (rec.disposition === 'reject') { %>
+                      <span style="color:var(--clr-fail);">reject — message was rejected</span>
+                      <% } else if (rec.disposition === 'quarantine') { %>
+                      <span style="color:var(--clr-warn);">quarantine — sent to spam</span>
+                      <% } else { %>
+                      <span class="text-secondary">none — delivered normally</span>
+                      <% } %>
+                    </div>
+                    <div class="detail-row"><span>Messages</span><strong><%= rec.count %></strong></div>
+                  </div>
+                </div>
+
+                <!-- DKIM -->
+                <div class="col-md-4">
+                  <div class="detail-card">
+                    <div class="detail-card-title">
+                      <i class="bi bi-key me-2"></i>DKIM
+                      <span class="ms-auto badge <%= rec.dkim_aligned === 'pass' ? 'badge-pass' : 'badge-fail' %>">
+                        <%= rec.dkim_aligned === 'pass' ? 'aligned' : 'not aligned' %>
+                      </span>
+                    </div>
+                    <div class="detail-row"><span>Auth result</span>
+                      <span class="<%= rec.dkim_auth_result === 'pass' ? 'pass-color' : 'fail-color' %>">
+                        <%= rec.dkim_auth_result || 'none' %>
+                      </span>
+                    </div>
+                    <% if (rec.dkim_domain) { %>
+                    <div class="detail-row"><span>Signing domain</span><code><%= rec.dkim_domain %></code></div>
+                    <% } %>
+                    <% if (rec.dkim_selector) { %>
+                    <div class="detail-row"><span>Selector</span><code><%= rec.dkim_selector %></code></div>
+                    <% } %>
+                    <div class="detail-row"><span>Header domain</span><code><%= report.domain %></code></div>
+                    <% if (rec.dkim_aligned !== 'pass') { %>
+                    <div class="detail-note fail-color">
+                      <% if (!rec.dkim_domain || rec.dkim_auth_result !== 'pass') { %>
+                      No valid DKIM signature found.
+                      <% } else { %>
+                      Signing domain <code><%= rec.dkim_domain %></code> does not match header domain <code><%= report.domain %></code>.
+                      <% } %>
+                    </div>
+                    <% } %>
+                  </div>
+                </div>
+
+                <!-- SPF -->
+                <div class="col-md-4">
+                  <div class="detail-card">
+                    <div class="detail-card-title">
+                      <i class="bi bi-shield-check me-2"></i>SPF
+                      <span class="ms-auto badge <%= rec.spf_aligned === 'pass' ? 'badge-pass' : 'badge-fail' %>">
+                        <%= rec.spf_aligned === 'pass' ? 'aligned' : 'not aligned' %>
+                      </span>
+                    </div>
+                    <div class="detail-row"><span>Auth result</span>
+                      <span class="<%= rec.spf_auth_result === 'pass' ? 'pass-color' : 'fail-color' %>">
+                        <%= rec.spf_auth_result || 'none' %>
+                      </span>
+                    </div>
+                    <% if (rec.spf_domain) { %>
+                    <div class="detail-row"><span>Envelope domain</span><code><%= rec.spf_domain %></code></div>
+                    <% } %>
+                    <div class="detail-row"><span>Header domain</span><code><%= report.domain %></code></div>
+                    <% if (rec.spf_aligned !== 'pass') { %>
+                    <div class="detail-note fail-color">
+                      <% if (rec.spf_auth_result !== 'pass') { %>
+                      Server <code><%= rec.source_ip %></code> is not listed in the SPF record for <code><%= rec.spf_domain || sendDomain %></code>.
+                      <% } else { %>
+                      SPF passed for <code><%= rec.spf_domain %></code> but this does not align with header domain <code><%= report.domain %></code>.
+                      <% } %>
+                    </div>
+                    <% } %>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Plain-English summary -->
+              <div class="detail-summary">
+                <i class="bi bi-info-circle me-2" style="flex-shrink:0;margin-top:1px;"></i>
+                <span>
+                  <%
+                    const ip = rec.source_ip || 'an unknown server';
+                    const hd = report.domain;
+                  %>
+                  <% if (rec.dmarc_pass) { %>
+                    This message from <strong><%= ip %></strong> passed DMARC.
+                    <% if (rec.dkim_aligned === 'pass' && rec.spf_aligned === 'pass') { %>
+                      Both DKIM and SPF were aligned with <strong><%= hd %></strong>.
+                    <% } else if (rec.dkim_aligned === 'pass') { %>
+                      DKIM was aligned with <strong><%= hd %></strong> (SPF was not aligned but is not required when DKIM passes).
+                    <% } else { %>
+                      SPF was aligned with <strong><%= hd %></strong> (DKIM was not aligned but is not required when SPF passes).
+                    <% } %>
+                  <% } else if (rec.failure_reason === 'dkim_and_spf') { %>
+                    The server at <strong><%= ip %></strong> sent mail claiming to be from <strong><%= hd %></strong>, but
+                    failed both authentication checks: it was not listed in the SPF record<% if (rec.spf_domain && rec.spf_domain !== hd) { %> for <code><%= rec.spf_domain %></code><% } %>
+                    and the message was not signed with a valid DKIM key for <strong><%= hd %></strong>.
+                    <% if (rec.disposition === 'reject') { %>The message was <strong>rejected</strong>.<% } else if (rec.disposition === 'quarantine') { %>The message was sent to <strong>spam</strong>.<% } %>
+                  <% } else if (rec.failure_reason === 'dkim_only') { %>
+                    The server at <strong><%= ip %></strong> passed SPF for <code><%= rec.spf_domain || sendDomain %></code>
+                    but the DKIM signature<% if (rec.dkim_domain) { %> (signed by <code><%= rec.dkim_domain %></code>)<% } %>
+                    did not align with the header domain <strong><%= hd %></strong>.
+                  <% } else if (rec.failure_reason === 'spf_only') { %>
+                    The message was signed by DKIM (domain <code><%= rec.dkim_domain || hd %></code>) but
+                    the sending server <strong><%= ip %></strong> is not authorised in the SPF record<% if (rec.spf_domain) { %> for <code><%= rec.spf_domain %></code><% } %>.
+                    This often happens with forwarded or relayed mail.
+                  <% } %>
+                </span>
+              </div>
+
+            </div>
+          </td>
+        </tr>
         <% } %>
       </tbody>
     </table>
   </div>
 </div>
+
+<style>
+  .record-row:hover { background: rgba(255,255,255,.035) !important; }
+  .record-row:hover .expand-icon { color: rgba(255,255,255,.7); }
+
+  .detail-panel {
+    background: rgba(0,0,0,.25);
+    border-top: 1px solid rgba(255,255,255,.06);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+
+  .detail-card {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    padding: 14px 16px;
+    height: 100%;
+  }
+  .detail-card-title {
+    font-size: .78rem;
+    font-weight: 600;
+    color: rgba(255,255,255,.5);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+  }
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    font-size: .8rem;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row > span:first-child { color: rgba(255,255,255,.42); flex-shrink: 0; }
+  .detail-note {
+    font-size: .77rem;
+    margin-top: 8px;
+    padding: 6px 8px;
+    border-radius: 7px;
+    background: rgba(255,69,58,.08);
+    border: 1px solid rgba(255,69,58,.18);
+    line-height: 1.5;
+  }
+
+  .detail-summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: .83rem;
+    color: rgba(255,255,255,.65);
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 10px;
+    padding: 10px 14px;
+    line-height: 1.6;
+  }
+  .detail-summary strong { color: rgba(255,255,255,.85); }
+</style>
+
+<script>
+  function toggleDetail(i) {
+    const row  = document.getElementById('detail-' + i);
+    const icon = document.getElementById('icon-' + i);
+    const open = row.style.display !== 'none';
+    row.style.display = open ? 'none' : 'table-row';
+    icon.style.transform = open ? '' : 'rotate(90deg)';
+  }
+</script>
